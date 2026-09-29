@@ -1,2 +1,1 @@
-Alle Dateien aus diesem Ordner direkt in das Hauptverzeichnis des GitHub-Repositories hochladen.
-Es gibt keine Unterordner. Die private NESSA_PRIVATE_IMPORT_v22.json NICHT zu GitHub hochladen.
+V2: obere Kopfzeile entfernt. Alle Dateien direkt ins Hauptverzeichnis des GitHub-Repositories hochladen und vorhandene Dateien ersetzen. Die private NESSA_PRIVATE_IMPORT_v22.json NICHT zu GitHub hochladen.

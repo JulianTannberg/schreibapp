@@ -102,3 +102,6 @@ button { -webkit-tap-highlight-color: transparent; }
   .chapter-body { line-height:1.34; }
   .topbar { height:50px; }
 }
+
+/* v2: obere Leiste entfernt; Navigation/Bearbeiten bleibt unten */
+.topbar { display:none !important; }
