@@ -1,5 +1,5 @@
-const CACHE = 'nessa-writer-v8-import-fix';
-const SHELL = ['./','./index.html','./styles.css?v=8','./app.js?v=8','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
+const CACHE = 'nessa-writer-v9-native-import';
+const SHELL = ['./','./index.html','./styles-v9.css','./app-v9.js','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting()));
 });

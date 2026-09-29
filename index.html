@@ -8,7 +8,7 @@
   <title>Nessa – Schreibfassung</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="icon-192.png" />
-  <link rel="stylesheet" href="styles.css?v=8" />
+  <link rel="stylesheet" href="styles-v9.css" />
 </head>
 <body>
   <div id="app" class="app-shell">
@@ -82,7 +82,10 @@
         <div class="stack">
           <button data-action="export-backup">Komplette Sicherung</button>
           <button data-action="export-chatgpt">Für ChatGPT exportieren – 4 Dateien (.zip)</button>
-          <button data-action="import-chatgpt-return">Überarbeiteten Stand von ChatGPT importieren (.zip)</button>
+          <label class="direct-file-import">
+            <span>Überarbeiteten Stand von ChatGPT importieren (.zip)</span>
+            <input id="chatgptReturnPicker" type="file" aria-label="Überarbeiteten Stand von ChatGPT auswählen" />
+          </label>
           <button data-action="export-master">Arbeitsmaster exportieren</button>
           <button data-action="accept-baseline" class="danger-lite">Änderungen als neuen Stand übernehmen</button>
         </div>
@@ -159,9 +162,8 @@
     </dialog>
 
     <input id="filePicker" type="file" class="hidden" />
-    <input id="chatgptReturnPicker" type="file" accept=".zip,application/zip,application/x-zip-compressed" class="hidden" />
     <div id="toast" class="toast hidden" role="status"></div>
   </div>
-  <script src="app.js?v=8" defer></script>
+  <script src="app-v9.js" defer></script>
 </body>
 </html>
