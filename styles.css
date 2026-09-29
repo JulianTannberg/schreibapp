@@ -39,7 +39,6 @@ button { -webkit-tap-highlight-color: transparent; }
   outline:none; transition:background .12s ease, color .12s ease;
 }
 .book-block.selected { box-shadow:inset 3px 0 0 var(--green); padding-left:.42em; }
-.book-block.changed.show-change { color:var(--green-change); }
 .book-block.changed.show-change::after {
   content:""; position:absolute; left:-10px; top:.2em; bottom:.2em; width:3px; border-radius:4px; background:var(--green);
 }
@@ -130,3 +129,87 @@ button { -webkit-tap-highlight-color: transparent; }
 .advanced summary::after { content:"›"; float:right; font-size:18px; transition:transform .15s ease; }
 .advanced[open] summary::after { transform:rotate(90deg); }
 .advanced-stack { padding:0 9px 9px; }
+
+
+/* v4: exakte Textänderungen + Dokumenteditor */
+.inline-change { color:var(--green-change); }
+.book-block.changed.show-change { color:var(--ink); }
+.doc-open-buttons { margin:8px 0 2px; }
+.doc-open-buttons button { font-size:13px; padding:9px 10px; }
+.doc-editor {
+  position:fixed; inset:0; z-index:70; display:flex; flex-direction:column;
+  background:var(--paper); color:var(--ink);
+}
+.doc-editor-head {
+  display:grid; grid-template-columns:48px 1fr 48px; align-items:center; gap:8px;
+  padding:max(8px, env(safe-area-inset-top)) 10px 8px;
+  background:var(--green); color:white; min-height:58px;
+}
+.doc-head-btn {
+  border:0; background:rgba(255,255,255,.14); color:white; border-radius:9px;
+  width:42px; height:42px; font:700 24px/1 system-ui,sans-serif;
+}
+.doc-editor-title { min-width:0; text-align:center; font-family:system-ui,sans-serif; }
+.doc-editor-title strong { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:16px; }
+.doc-editor-title small { display:block; opacity:.82; font-size:11px; margin-top:2px; }
+.doc-editor-text {
+  flex:1; width:100%; border:0; outline:0; resize:none; padding:22px 20px calc(28px + env(safe-area-inset-bottom));
+  background:var(--paper); color:var(--ink); font-family:Georgia,"Times New Roman",serif;
+  font-size:19px; line-height:1.48; tab-size:2;
+}
+
+
+/* v5: kein Verrutschen bei Auswahl + sichtbare, einklappbare Löschungen */
+.book-block.selected {
+  box-shadow:none !important;
+  padding-left:.08em !important;
+  background:rgba(116,132,107,.075);
+}
+.deletion-wrap {
+  display:inline;
+  font-size:.82em;
+  font-family:system-ui,sans-serif;
+  vertical-align:.08em;
+}
+.deletion-marker {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:1.15em;
+  height:1.15em;
+  margin:0 .12em;
+  padding:0 .18em;
+  border:0;
+  border-radius:999px;
+  background:#a86f64;
+  color:#fff;
+  font:700 .82em/1 system-ui,sans-serif;
+  vertical-align:.10em;
+}
+.deleted-inline {
+  display:none;
+  margin:0 .14em;
+  padding:.04em .22em;
+  border-radius:4px;
+  background:rgba(168,111,100,.10);
+  color:#8d5c53;
+  text-decoration:line-through;
+  font-size:.92em;
+}
+.deletion-wrap.open .deleted-inline { display:inline; }
+.change-legend {
+  margin:5px 0 0;
+  color:var(--muted);
+  font:12px/1.35 system-ui,sans-serif;
+}
+.legend-add { color:var(--green-change); font-weight:700; }
+.legend-del {
+  display:inline-grid;
+  place-items:center;
+  min-width:1.25em;
+  height:1.25em;
+  border-radius:999px;
+  background:#a86f64;
+  color:#fff;
+  font-weight:800;
+}

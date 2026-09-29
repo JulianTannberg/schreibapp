@@ -73,14 +73,15 @@
       <section class="drawer-section">
         <h2>Darstellung</h2>
         <label class="setting-row">Schriftgröße <input id="fontSize" type="range" min="18" max="30" step="1" value="23" /></label>
-        <label class="setting-row"><input id="showChanges" type="checkbox" checked /> Änderungen grün markieren</label>
+        <label class="setting-row"><input id="showChanges" type="checkbox" checked /> Änderungen anzeigen</label>
+        <p class="change-legend"><span class="legend-add">grün</span> = neu/geändert · <span class="legend-del">−</span> = gelöschter Text (antippen zum Anzeigen)</p>
       </section>
 
       <section class="drawer-section">
         <h2>Sicherung & Übergabe</h2>
         <div class="stack">
           <button data-action="export-backup">Komplette Sicherung</button>
-          <button data-action="export-chatgpt">Für ChatGPT exportieren</button>
+          <button data-action="export-chatgpt">Für ChatGPT exportieren – 4 Dateien (.zip)</button>
           <button data-action="export-master">Arbeitsmaster exportieren</button>
           <button data-action="accept-baseline" class="danger-lite">Änderungen als neuen Stand übernehmen</button>
         </div>
@@ -92,6 +93,11 @@
           <div><span id="masterStatusIcon">○</span><span>Arbeitsmaster</span><small id="masterStatusText">nicht geladen</small></div>
           <div><span id="libraryStatusIcon">○</span><span>Storybibliothek</span><small id="libraryStatusText">nicht geladen</small></div>
           <div><span id="revisionsStatusIcon">○</span><span>Revisionsstand</span><small id="revisionsStatusText">nicht geladen</small></div>
+        </div>
+
+        <div class="stack doc-open-buttons">
+          <button data-action="open-library">Storybibliothek ansehen / bearbeiten</button>
+          <button data-action="open-revisions">Revisionsstand ansehen / bearbeiten</button>
         </div>
 
         <details class="advanced">
@@ -115,6 +121,18 @@
         <p><strong>Privatmodus:</strong> Roman, Storybibliothek, Revisionsstand, Notizen und Änderungen werden ausschließlich in IndexedDB auf diesem Gerät gespeichert. Die App sendet keine Buchdaten an einen Server.</p>
       </section>
     </aside>
+
+    <section id="docEditor" class="doc-editor hidden" aria-label="Projektdokument bearbeiten">
+      <header class="doc-editor-head">
+        <button id="closeDocEditorBtn" class="doc-head-btn" aria-label="Dokument schließen">‹</button>
+        <div class="doc-editor-title">
+          <strong id="docEditorTitle">Dokument</strong>
+          <small id="docEditorState">lokal gespeichert</small>
+        </div>
+        <button id="doneDocEditorBtn" class="doc-head-btn" aria-label="Fertig">✓</button>
+      </header>
+      <textarea id="docEditorText" class="doc-editor-text" spellcheck="true"></textarea>
+    </section>
 
     <dialog id="noteDialog" class="dialog">
       <form method="dialog" id="noteForm">
