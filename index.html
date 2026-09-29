@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#74846b" />
+  <meta name="color-scheme" content="light" />
+  <title>Nessa – Schreibfassung</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <header class="topbar">
+      <button id="menuBtn" class="icon-btn" aria-label="Menü öffnen">☰</button>
+      <div class="top-title">
+        <span id="bookTitle">Nessa – Schreibfassung</span>
+        <small id="saveState">lokal</small>
+      </div>
+      <button id="editBtn" class="icon-btn" aria-label="Bearbeiten">✎</button>
+    </header>
+
+    <main id="reader" class="reader" aria-live="polite">
+      <section id="emptyState" class="empty-state">
+        <h1>Dein Buch bleibt auf diesem Gerät.</h1>
+        <p>Die App selbst enthält keinen Romantext. Importiere deinen privaten Projektstand direkt vom Handy. Die Datei wird nur lokal gelesen und in diesem Browser gespeichert.</p>
+        <div class="empty-actions">
+          <button class="primary" data-action="import-private">Privaten Projektstand importieren</button>
+          <button class="secondary" data-action="import-master">Nur Arbeitsmaster importieren</button>
+        </div>
+        <p class="privacy-note">Keine Anmeldung · keine Cloud · keine Analyse · kein Upload</p>
+      </section>
+
+      <article id="chapterView" class="chapter-view hidden">
+        <h1 id="chapterTitle" class="chapter-title"></h1>
+        <div id="chapterBody" class="chapter-body"></div>
+      </article>
+    </main>
+
+    <nav class="bottom-bar" aria-label="Kapitel-Navigation">
+      <button id="drawerBtn" class="bottom-btn" aria-label="Kapitel und Einstellungen">☰</button>
+      <button id="modeBtn" class="bottom-btn" aria-label="Bearbeiten">✎</button>
+      <div id="chapterCounter" class="chapter-counter">–</div>
+      <button id="prevBtn" class="bottom-btn" aria-label="Vorheriges Kapitel">‹</button>
+      <button id="nextBtn" class="bottom-btn" aria-label="Nächstes Kapitel">›</button>
+    </nav>
+
+    <div id="drawerBackdrop" class="backdrop hidden"></div>
+    <aside id="drawer" class="drawer" aria-label="Menü">
+      <div class="drawer-head">
+        <strong>Schreibfassung</strong>
+        <button id="closeDrawerBtn" class="text-btn">Schließen</button>
+      </div>
+
+      <section class="drawer-section">
+        <h2>Kapitel</h2>
+        <div class="search-wrap"><input id="chapterSearch" type="search" placeholder="Kapitel oder Text suchen …" /></div>
+        <div id="chapterList" class="chapter-list"></div>
+      </section>
+
+      <section class="drawer-section actions-grid">
+        <button data-action="toggle-edit">Bearbeiten</button>
+        <button data-action="toggle-changes">Änderungen anzeigen</button>
+        <button data-action="add-note">Notiz</button>
+        <button data-action="add-followup">Folge prüfen</button>
+      </section>
+
+      <section class="drawer-section">
+        <h2>Offene Folgeprüfungen</h2>
+        <div id="followupList" class="followup-list"></div>
+      </section>
+
+      <section class="drawer-section">
+        <h2>Darstellung</h2>
+        <label class="setting-row">Schriftgröße <input id="fontSize" type="range" min="18" max="30" step="1" value="23" /></label>
+        <label class="setting-row"><input id="showChanges" type="checkbox" checked /> Änderungen grün markieren</label>
+      </section>
+
+      <section class="drawer-section">
+        <h2>Import & Sicherung</h2>
+        <div class="stack">
+          <button data-action="install">App installieren / Startbildschirm</button>
+          <button data-action="import-private">Privaten Projektstand importieren</button>
+          <button data-action="import-master">Arbeitsmaster importieren</button>
+          <button data-action="import-library">Storybibliothek importieren</button>
+          <button data-action="import-revisions">Revisionsstand importieren</button>
+          <button data-action="export-backup">Sicherung (.json)</button>
+          <button data-action="export-master">Arbeitsmaster (.md)</button>
+          <button data-action="export-chatgpt">Für ChatGPT exportieren (.md)</button>
+          <button data-action="accept-baseline" class="danger-lite">Stand übernehmen</button>
+        </div>
+      </section>
+
+      <section class="drawer-section">
+        <h2>Lokale Versionen</h2>
+        <div id="snapshotList" class="snapshot-list"></div>
+      </section>
+
+      <section class="drawer-section smallprint">
+        <p><strong>Privatmodus:</strong> Roman, Storybibliothek, Revisionsstand, Notizen und Änderungen werden ausschließlich in IndexedDB auf diesem Gerät gespeichert. Die App sendet keine Buchdaten an einen Server.</p>
+      </section>
+    </aside>
+
+    <dialog id="noteDialog" class="dialog">
+      <form method="dialog" id="noteForm">
+        <h2 id="noteDialogTitle">Notiz</h2>
+        <p id="noteContext" class="note-context"></p>
+        <textarea id="noteText" rows="5" placeholder="Schreib hier deine Notiz …"></textarea>
+        <div class="dialog-actions">
+          <button value="cancel" class="secondary">Abbrechen</button>
+          <button id="saveNoteBtn" value="default" class="primary">Speichern</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="confirmDialog" class="dialog">
+      <form method="dialog">
+        <h2 id="confirmTitle">Bestätigen</h2>
+        <p id="confirmText"></p>
+        <div class="dialog-actions">
+          <button value="cancel" class="secondary">Abbrechen</button>
+          <button id="confirmOk" value="default" class="primary">Bestätigen</button>
+        </div>
+      </form>
+    </dialog>
+
+    <input id="filePicker" type="file" class="hidden" />
+    <div id="toast" class="toast hidden" role="status"></div>
+  </div>
+  <script src="app.js" defer></script>
+</body>
+</html>
