@@ -105,3 +105,28 @@ button { -webkit-tap-highlight-color: transparent; }
 
 /* v2: obere Leiste entfernt; Navigation/Bearbeiten bleibt unten */
 .topbar { display:none !important; }
+
+/* v3: aufgeräumtes Menü */
+.project-status {
+  display:grid; gap:6px; margin:4px 0 10px;
+  font:500 13px/1.35 system-ui,sans-serif;
+}
+.project-status > div {
+  display:grid; grid-template-columns:22px 1fr auto; align-items:center; gap:7px;
+  padding:7px 8px; border-radius:8px; background:rgba(255,255,255,.20);
+}
+.project-status > div > span:first-child {
+  color:var(--green-dark); font-weight:800; font-size:17px; text-align:center;
+}
+.project-status small { color:var(--muted); max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.advanced {
+  margin-top:9px; border:1px solid var(--line); border-radius:9px; background:rgba(255,255,255,.14);
+}
+.advanced summary {
+  cursor:pointer; list-style:none; padding:10px 12px;
+  font:700 13px system-ui,sans-serif; color:var(--green-dark);
+}
+.advanced summary::-webkit-details-marker { display:none; }
+.advanced summary::after { content:"›"; float:right; font-size:18px; transition:transform .15s ease; }
+.advanced[open] summary::after { transform:rotate(90deg); }
+.advanced-stack { padding:0 9px 9px; }

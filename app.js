@@ -16,6 +16,9 @@
     editBtn: $('#editBtn'), modeBtn: $('#modeBtn'), prevBtn: $('#prevBtn'), nextBtn: $('#nextBtn'),
     chapterList: $('#chapterList'), chapterSearch: $('#chapterSearch'), followupList: $('#followupList'), snapshotList: $('#snapshotList'),
     fontSize: $('#fontSize'), showChanges: $('#showChanges'), filePicker: $('#filePicker'), toast: $('#toast'),
+    masterStatusIcon: $('#masterStatusIcon'), masterStatusText: $('#masterStatusText'),
+    libraryStatusIcon: $('#libraryStatusIcon'), libraryStatusText: $('#libraryStatusText'),
+    revisionsStatusIcon: $('#revisionsStatusIcon'), revisionsStatusText: $('#revisionsStatusText'),
     noteDialog: $('#noteDialog'), noteForm: $('#noteForm'), noteDialogTitle: $('#noteDialogTitle'), noteContext: $('#noteContext'), noteText: $('#noteText'), saveNoteBtn: $('#saveNoteBtn'),
     confirmDialog: $('#confirmDialog'), confirmTitle: $('#confirmTitle'), confirmText: $('#confirmText'), confirmOk: $('#confirmOk')
   };
@@ -202,7 +205,7 @@
       els.chapterView.classList.add('hidden');
       els.chapterCounter.textContent = '–';
       els.prevBtn.disabled = true; els.nextBtn.disabled = true;
-      renderChapterList(); renderFollowups();
+      renderChapterList(); renderFollowups(); renderProjectStatus();
       return;
     }
     els.empty.classList.add('hidden');
@@ -239,6 +242,7 @@
     els.editBtn.textContent = editMode ? '✓' : '✎';
     renderChapterList(els.chapterSearch.value);
     renderFollowups();
+    renderProjectStatus();
   }
 
   function selectBlock(id) {
@@ -362,6 +366,32 @@
     });
   }
 
+  function renderProjectStatus() {
+    const setStatus = (iconEl, textEl, loaded, label) => {
+      if (!iconEl || !textEl) return;
+      iconEl.textContent = loaded ? '✓' : '○';
+      textEl.textContent = loaded ? (label || 'geladen') : 'nicht geladen';
+    };
+    setStatus(
+      els.masterStatusIcon,
+      els.masterStatusText,
+      !!state?.book?.chapters?.length,
+      state?.book?.sourceName || (state?.book?.chapters?.length ? `${state.book.chapters.length} Kapitel` : '')
+    );
+    setStatus(
+      els.libraryStatusIcon,
+      els.libraryStatusText,
+      !!state?.library?.text,
+      state?.library?.name || 'geladen'
+    );
+    setStatus(
+      els.revisionsStatusIcon,
+      els.revisionsStatusText,
+      !!state?.revisions?.text,
+      state?.revisions?.name || 'geladen'
+    );
+  }
+
   function renderFollowups() {
     els.followupList.innerHTML = '';
     if (!state) return;
@@ -429,9 +459,9 @@
       state.metadata.baselineAt=nowIso(); state.metadata.baselineLabel=`Import ${file.name}`;
       dirtySinceSnapshot=false; await persist(false); render(); await createSnapshot('Arbeitsmaster importiert'); toast(`${state.book.chapters.length} Kapitel lokal importiert`);
     } else if (pendingPickerMode==='library') {
-      state.library={name:file.name,text}; await persist(false); toast('Storybibliothek lokal gespeichert');
+      state.library={name:file.name,text}; await persist(false); renderProjectStatus(); toast('Storybibliothek lokal gespeichert');
     } else if (pendingPickerMode==='revisions') {
-      state.revisions={name:file.name,text}; await persist(false); toast('Revisionsstand lokal gespeichert');
+      state.revisions={name:file.name,text}; await persist(false); renderProjectStatus(); toast('Revisionsstand lokal gespeichert');
     }
   }
 
@@ -564,7 +594,7 @@
   async function init(){
     db=await openDb();
     state=await dbGet('state',PROJECT_KEY) || baseState();
-    applySettings(); bindEvents(); render(); renderSnapshots();
+    applySettings(); bindEvents(); render(); renderProjectStatus(); renderSnapshots();
     if('serviceWorker' in navigator){ try{ await navigator.serviceWorker.register('./sw.js'); }catch(err){ console.warn('Service Worker konnte nicht registriert werden',err); } }
   }
 

@@ -61,7 +61,6 @@
 
       <section class="drawer-section actions-grid">
         <button data-action="toggle-edit">Bearbeiten</button>
-        <button data-action="toggle-changes">Änderungen anzeigen</button>
         <button data-action="add-note">Notiz</button>
         <button data-action="add-followup">Folge prüfen</button>
       </section>
@@ -78,18 +77,33 @@
       </section>
 
       <section class="drawer-section">
-        <h2>Import & Sicherung</h2>
+        <h2>Sicherung & Übergabe</h2>
         <div class="stack">
-          <button data-action="install">App installieren / Startbildschirm</button>
-          <button data-action="import-private">Privaten Projektstand importieren</button>
-          <button data-action="import-master">Arbeitsmaster importieren</button>
-          <button data-action="import-library">Storybibliothek importieren</button>
-          <button data-action="import-revisions">Revisionsstand importieren</button>
-          <button data-action="export-backup">Sicherung (.json)</button>
-          <button data-action="export-master">Arbeitsmaster (.md)</button>
-          <button data-action="export-chatgpt">Für ChatGPT exportieren (.md)</button>
-          <button data-action="accept-baseline" class="danger-lite">Stand übernehmen</button>
+          <button data-action="export-backup">Komplette Sicherung</button>
+          <button data-action="export-chatgpt">Für ChatGPT exportieren</button>
+          <button data-action="export-master">Arbeitsmaster exportieren</button>
+          <button data-action="accept-baseline" class="danger-lite">Änderungen als neuen Stand übernehmen</button>
         </div>
+      </section>
+
+      <section class="drawer-section">
+        <h2>Projektdateien</h2>
+        <div class="project-status">
+          <div><span id="masterStatusIcon">○</span><span>Arbeitsmaster</span><small id="masterStatusText">nicht geladen</small></div>
+          <div><span id="libraryStatusIcon">○</span><span>Storybibliothek</span><small id="libraryStatusText">nicht geladen</small></div>
+          <div><span id="revisionsStatusIcon">○</span><span>Revisionsstand</span><small id="revisionsStatusText">nicht geladen</small></div>
+        </div>
+
+        <details class="advanced">
+          <summary>Erweitert / Import</summary>
+          <div class="stack advanced-stack">
+            <button data-action="import-private">Kompletten privaten Projektstand importieren</button>
+            <button data-action="import-master">Arbeitsmaster einzeln importieren</button>
+            <button data-action="import-library">Storybibliothek einzeln importieren</button>
+            <button data-action="import-revisions">Revisionsstand einzeln importieren</button>
+            <button data-action="install">App installieren / Startbildschirm</button>
+          </div>
+        </details>
       </section>
 
       <section class="drawer-section">
