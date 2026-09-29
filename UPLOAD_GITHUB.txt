@@ -1,0 +1,2 @@
+Alle Dateien aus diesem Ordner direkt in das Hauptverzeichnis des GitHub-Repositories hochladen.
+Es gibt keine Unterordner. Die private NESSA_PRIVATE_IMPORT_v22.json NICHT zu GitHub hochladen.
