@@ -739,12 +739,132 @@
   function openPicker(mode) {
     pendingPickerMode=mode;
     els.filePicker.value='';
-    els.filePicker.accept = mode==='private' ? '.json,application/json' : '.md,.txt,text/plain,text/markdown';
+    if (mode==='private') els.filePicker.accept='.json,application/json';
+    else if (mode==='chatgpt-return') els.filePicker.accept='.zip,application/zip,application/x-zip-compressed';
+    else els.filePicker.accept='.md,.txt,text/plain,text/markdown';
     els.filePicker.click();
+  }
+
+  async function unzipTextFiles(file) {
+    const buf=await file.arrayBuffer();
+    const bytes=new Uint8Array(buf);
+    const dv=new DataView(buf);
+    const dec=new TextDecoder('utf-8');
+    const out={};
+    let p=0;
+
+    const inflateRaw=async(data)=>{
+      if(typeof DecompressionStream==='undefined') throw new Error('Dieses ZIP verwendet Komprimierung, die dieser Browser nicht lesen kann.');
+      const ds=new DecompressionStream('deflate-raw');
+      const stream=new Blob([data]).stream().pipeThrough(ds);
+      return new Uint8Array(await new Response(stream).arrayBuffer());
+    };
+
+    while(p+4<=bytes.length) {
+      const sig=dv.getUint32(p,true);
+      if(sig===0x04034b50) {
+        if(p+30>bytes.length) throw new Error('ZIP-Datei ist beschädigt.');
+        const flags=dv.getUint16(p+6,true);
+        const method=dv.getUint16(p+8,true);
+        const compSize=dv.getUint32(p+18,true);
+        const nameLen=dv.getUint16(p+26,true);
+        const extraLen=dv.getUint16(p+28,true);
+        if(flags & 0x0008) throw new Error('ZIP mit Daten-Deskriptor wird noch nicht unterstützt.');
+        const nameStart=p+30;
+        const dataStart=nameStart+nameLen+extraLen;
+        const dataEnd=dataStart+compSize;
+        if(dataEnd>bytes.length) throw new Error('ZIP-Datei ist unvollständig.');
+        const name=dec.decode(bytes.slice(nameStart,nameStart+nameLen));
+        const packed=bytes.slice(dataStart,dataEnd);
+        let raw;
+        if(method===0) raw=packed;
+        else if(method===8) raw=await inflateRaw(packed);
+        else throw new Error(`ZIP-Komprimierung ${method} wird nicht unterstützt.`);
+        out[name]=dec.decode(raw);
+        p=dataEnd;
+        continue;
+      }
+      if(sig===0x02014b50 || sig===0x06054b50) break;
+      p++;
+    }
+    return out;
+  }
+
+  function findZipFile(files, pattern) {
+    const key=Object.keys(files).find(name=>pattern.test(name.split('/').pop()));
+    return key ? files[key] : null;
+  }
+
+  async function importChatGPTReturn(file) {
+    const files=await unzipTextFiles(file);
+    const master=findZipFile(files,/^01_.*ARBEITSMASTER.*\.md$/i);
+    const library=findZipFile(files,/^02_.*STORYBIBLIOTHEK.*\.md$/i);
+    const revisions=findZipFile(files,/^03_.*REVISIONSSTAND.*\.md$/i);
+    if(!master || !library || !revisions) {
+      throw new Error('In der Rückgabe-ZIP fehlen Arbeitsmaster, Storybibliothek oder Revisionsstand.');
+    }
+
+    let manifest=null;
+    const manifestText=findZipFile(files,/^00_CHATGPT_RUECKGABE\.json$/i);
+    if(manifestText) {
+      try { manifest=JSON.parse(manifestText); }
+      catch { throw new Error('Die ChatGPT-Rückgabe enthält eine ungültige Rückgabe-Info.'); }
+    }
+
+    await createSnapshot('Vor ChatGPT-Rückgabe');
+    const oldNotes=clone(state?.notes || []);
+    const oldSettings=clone(state?.settings || {fontSize:23,showChanges:true});
+    const oldCreatedAt=state?.metadata?.createdAt || nowIso();
+    const oldIndex=currentChapterIndex;
+
+    const next=baseState();
+    next.settings=oldSettings;
+    next.metadata.createdAt=oldCreatedAt;
+    next.book=parseMaster(master,'01_NESSA_SNAPE_ARBEITSMASTER_AKTUELL.md');
+    next.library={name:'02_NESSA_SNAPE_STORYBIBLIOTHEK_AKTUELL.md',text:library,baselineText:library,modifiedAt:null};
+    next.revisions={name:'03_NESSA_SNAPE_REVISIONSSTAND_AKTUELL.md',text:revisions,baselineText:revisions,modifiedAt:null};
+
+    const processedIds=new Set([
+      ...(manifest?.processedNoteIds || []),
+      ...(manifest?.processedFollowupIds || [])
+    ]);
+    const processedTexts=new Set([
+      ...(manifest?.processedNoteTexts || []),
+      ...(manifest?.processedFollowupTexts || [])
+    ]);
+
+    next.notes=oldNotes.map(n=>{
+      if(processedIds.has(n.id) || processedTexts.has(n.text)) {
+        return {...n,resolved:true,resolvedAt:nowIso()};
+      }
+      return n;
+    });
+
+    next.metadata.baselineAt=nowIso();
+    next.metadata.baselineLabel=manifest?.label || `ChatGPT-Rückgabe ${file.name}`;
+    state=next;
+    currentChapterIndex=Math.min(oldIndex, Math.max(0,(state.book?.chapters?.length||1)-1));
+    activeBlockId=null;
+    pendingEditSelection=null;
+    editMode=false;
+    dirtySinceSnapshot=false;
+
+    await persist(false);
+    render();
+    renderProjectStatus();
+    renderFollowups();
+    await createSnapshot('ChatGPT-Stand importiert');
+
+    const resolved=next.notes.filter(n=>n.resolved && (processedIds.has(n.id)||processedTexts.has(n.text))).length;
+    toast(`Überarbeiteter Stand übernommen${resolved ? ` · ${resolved} Hinweis${resolved===1?'':'e'} abgearbeitet` : ''}`);
   }
 
   async function handleFile(file) {
     if (!file) return;
+    if (pendingPickerMode==='chatgpt-return') {
+      await importChatGPTReturn(file);
+      return;
+    }
     const text=await file.text();
     if (pendingPickerMode==='private') {
       let obj;
@@ -840,17 +960,17 @@
 
   function buildChatGPTHints() {
     const open=state.notes.filter(n=>n.type==='followup'&&!n.resolved);
-    const ownNotes=state.notes.filter(n=>n.type==='note');
+    const ownNotes=state.notes.filter(n=>n.type==='note'&&!n.resolved);
     const changes=changedBlocks();
     const lines=[];
     lines.push('# NESSA-SNAPE – HINWEISE FÜR CHATGPT','',`Export: ${new Date().toLocaleString('de-DE')}`,'',
       'Diese ZIP stammt aus der lokalen Nessa-Schreib-PWA. Sie enthält immer vier Dateien: diese Änderungs-/Folgeprüfungsdatei, den aktuellen Arbeitsmaster, die aktuelle Storybibliothek und den aktuellen Revisionsstand. Bitte prüfe offene Folgeprüfungen im gesamten Arbeitsmaster und – soweit relevant – in Storybibliothek und Revisionsstand.','');
     lines.push('## Offene Folgeprüfungen','');
     if(!open.length) lines.push('_Keine offenen Folgeprüfungen._','');
-    for(const n of open){ const ch=state.book.chapters.find(c=>c.id===n.chapterId); const b=ch?.blocks.find(x=>x.id===n.blockId); lines.push(`### Kapitel ${ch?.number ?? '?'} – ${ch?.title ?? ''}`,`**Hinweis:** ${n.text}`,`**Bezug:** ${blockExcerpt(b,260)}`,''); }
+    for(const n of open){ const ch=state.book.chapters.find(c=>c.id===n.chapterId); const b=ch?.blocks.find(x=>x.id===n.blockId); lines.push(`### Kapitel ${ch?.number ?? '?'} – ${ch?.title ?? ''}`,`**ID:** ${n.id}`,`**Hinweis:** ${n.text}`,`**Bezug:** ${blockExcerpt(b,260)}`,''); }
     lines.push('## Eigene Notizen','');
     if(!ownNotes.length) lines.push('_Keine zusätzlichen Notizen._','');
-    for(const n of ownNotes){ const ch=state.book.chapters.find(c=>c.id===n.chapterId); const b=ch?.blocks.find(x=>x.id===n.blockId); lines.push(`### Kapitel ${ch?.number ?? '?'} – ${ch?.title ?? ''}`,`**Notiz:** ${n.text}`,`**Bezug:** ${blockExcerpt(b,260)}`,''); }
+    for(const n of ownNotes){ const ch=state.book.chapters.find(c=>c.id===n.chapterId); const b=ch?.blocks.find(x=>x.id===n.blockId); lines.push(`### Kapitel ${ch?.number ?? '?'} – ${ch?.title ?? ''}`,`**ID:** ${n.id}`,`**Notiz:** ${n.text}`,`**Bezug:** ${blockExcerpt(b,260)}`,''); }
     lines.push('## Eigene Änderungen am Roman seit dem Basisstand','');
     if(!changes.length) lines.push('_Keine lokal markierten Textänderungen seit dem Basisstand._','');
     for(const {chapter,block} of changes){ lines.push(`### Kapitel ${chapter.number} – ${chapter.title}`,`**Vorher:** ${block.baselineText || '— neu eingefügt —'}`,`**Jetzt:** ${block.text}`,''); }
@@ -926,6 +1046,7 @@
       case 'import-master': openPicker('master'); break;
       case 'import-library': openPicker('library'); break;
       case 'import-revisions': openPicker('revisions'); break;
+      case 'import-chatgpt-return': openPicker('chatgpt-return'); break;
       case 'open-library': openProjectDoc('library'); break;
       case 'open-revisions': openProjectDoc('revisions'); break;
       case 'toggle-edit': setEditMode(!editMode); break;
