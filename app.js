@@ -171,36 +171,102 @@
 
   function renderDiffInto(el, baselineText, currentText) {
     el.textContent='';
-    for(const part of diffTokens(baselineText || '', currentText || '')) {
-      if(part.type === 'add') {
-        const span=document.createElement('span');
-        span.className='inline-change';
-        span.textContent=part.text;
-        el.appendChild(span);
-      } else if(part.type === 'del') {
-        // Reine Leerraum-Löschungen werden nicht extra markiert.
-        if(!part.text.trim()) continue;
+    const parts = diffTokens(baselineText || '', currentText || '');
+
+    // Kleine unveränderte Zwischenstücke innerhalb einer Überarbeitung
+    // gehören optisch noch zu derselben Änderung. So gibt es für einen
+    // zusammenhängenden gelöschten/ersetzten Abschnitt nur EIN Minus.
+    const isTinySame = (part) => {
+      if (!part || part.type !== 'same') return false;
+      const words = (part.text.match(/[^\\s]+/gu) || []).length;
+      return words <= 1;
+    };
+
+    const groups = [];
+    let i = 0;
+
+    while (i < parts.length) {
+      if (parts[i].type === 'same') {
+        groups.push({type:'same', parts:[parts[i]]});
+        i++;
+        continue;
+      }
+
+      const editParts = [];
+      let j = i;
+
+      while (j < parts.length) {
+        const p = parts[j];
+
+        if (p.type !== 'same') {
+          editParts.push(p);
+          j++;
+          continue;
+        }
+
+        if (isTinySame(p) && j + 1 < parts.length && parts[j + 1].type !== 'same') {
+          editParts.push(p);
+          j++;
+          continue;
+        }
+
+        break;
+      }
+
+      groups.push({type:'edit', parts:editParts});
+      i = j;
+    }
+
+    for (const group of groups) {
+      if (group.type === 'same') {
+        el.appendChild(document.createTextNode(group.parts[0].text));
+        continue;
+      }
+
+      const deletedText = group.parts
+        .filter(p => p.type === 'del')
+        .map(p => p.text)
+        .join('')
+        .replace(/\\s+/g,' ')
+        .trim();
+
+      if (deletedText) {
         const wrap=document.createElement('span');
         wrap.className='deletion-wrap';
+
         const marker=document.createElement('button');
         marker.type='button';
         marker.className='deletion-marker';
         marker.textContent='−';
         marker.title='Gelöschten Text anzeigen';
         marker.setAttribute('aria-label','Gelöschten Text anzeigen');
+
         const deleted=document.createElement('span');
         deleted.className='deleted-inline';
-        deleted.textContent=part.text.replace(/\s+/g,' ').trim();
+        deleted.textContent=deletedText;
+
         marker.addEventListener('click',e=>{
           e.preventDefault();
           e.stopPropagation();
           wrap.classList.toggle('open');
           marker.setAttribute('aria-expanded', wrap.classList.contains('open') ? 'true' : 'false');
         });
+
         wrap.append(marker,deleted);
         el.appendChild(wrap);
-      } else {
-        el.appendChild(document.createTextNode(part.text));
+      }
+
+      for (const p of group.parts) {
+        if (p.type === 'del') continue;
+
+        if (p.type === 'add') {
+          const span=document.createElement('span');
+          span.className='inline-change';
+          span.textContent=p.text;
+          el.appendChild(span);
+        } else {
+          el.appendChild(document.createTextNode(p.text));
+        }
       }
     }
   }
