@@ -15,7 +15,7 @@
     menuBtn: $('#menuBtn'), drawerBtn: $('#drawerBtn'), closeDrawerBtn: $('#closeDrawerBtn'), drawer: $('#drawer'), backdrop: $('#drawerBackdrop'),
     editBtn: $('#editBtn'), modeBtn: $('#modeBtn'), prevBtn: $('#prevBtn'), nextBtn: $('#nextBtn'),
     chapterList: $('#chapterList'), chapterSearch: $('#chapterSearch'), followupList: $('#followupList'), snapshotList: $('#snapshotList'),
-    fontSize: $('#fontSize'), showChanges: $('#showChanges'), filePicker: $('#filePicker'), toast: $('#toast'),
+    fontSize: $('#fontSize'), showChanges: $('#showChanges'), filePicker: $('#filePicker'), chatgptReturnPicker: $('#chatgptReturnPicker'), toast: $('#toast'),
     masterStatusIcon: $('#masterStatusIcon'), masterStatusText: $('#masterStatusText'),
     libraryStatusIcon: $('#libraryStatusIcon'), libraryStatusText: $('#libraryStatusText'),
     revisionsStatusIcon: $('#revisionsStatusIcon'), revisionsStatusText: $('#revisionsStatusText'),
@@ -1046,7 +1046,12 @@
       case 'import-master': openPicker('master'); break;
       case 'import-library': openPicker('library'); break;
       case 'import-revisions': openPicker('revisions'); break;
-      case 'import-chatgpt-return': openPicker('chatgpt-return'); break;
+      case 'import-chatgpt-return':
+        closeDrawer();
+        toast('Überarbeitete ZIP von ChatGPT auswählen …');
+        els.chatgptReturnPicker.value='';
+        els.chatgptReturnPicker.click();
+        break;
       case 'open-library': openProjectDoc('library'); break;
       case 'open-revisions': openProjectDoc('revisions'); break;
       case 'toggle-edit': setEditMode(!editMode); break;
@@ -1068,6 +1073,17 @@
     els.chapterSearch.addEventListener('input',()=>renderChapterList(els.chapterSearch.value));
     document.addEventListener('click',e=>{ const btn=e.target.closest('[data-action]'); if(btn) action(btn.dataset.action); });
     els.filePicker.addEventListener('change',async()=>{ try{ await handleFile(els.filePicker.files[0]); }catch(err){ console.error(err); toast(err.message || 'Import fehlgeschlagen'); } });
+    els.chatgptReturnPicker.addEventListener('change',async()=>{
+      const file=els.chatgptReturnPicker.files?.[0];
+      if(!file) return;
+      try{
+        toast('ChatGPT-Stand wird eingelesen …');
+        await importChatGPTReturn(file);
+      }catch(err){
+        console.error(err);
+        toast(err.message || 'ChatGPT-Rückgabe konnte nicht importiert werden');
+      }
+    });
     els.fontSize.addEventListener('input',()=>{ if(!state) state=baseState(); state.settings.fontSize=Number(els.fontSize.value); applySettings(); schedulePersist(); });
     els.showChanges.addEventListener('change',()=>{ if(!state) return; state.settings.showChanges=els.showChanges.checked; schedulePersist(); render(); });
     els.noteForm.addEventListener('submit',e=>{ if(e.submitter===els.saveNoteBtn) saveNote(); });
