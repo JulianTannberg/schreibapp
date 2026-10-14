@@ -6,6 +6,19 @@
   const PROJECT_KEY = 'current';
   const MAX_SNAPSHOTS = 20;
 
+  // Persönlicher Bearbeitungsstand der Kapitel.
+  // Diese Vorgaben stammen aus dem bisher dokumentierten Arbeitsstand;
+  // danach kann der Status direkt in der Kapitelübersicht geändert werden.
+  const DEFAULT_REVIEW_DONE = new Set([1,2,4,24,32,33,34,35,62,65,68,72,73]);
+  const DEFAULT_REVIEW_STARTED = new Set([31]);
+
+  function defaultChapterStatuses() {
+    const out = {};
+    DEFAULT_REVIEW_DONE.forEach(n => { out[String(n)] = 'done'; });
+    DEFAULT_REVIEW_STARTED.forEach(n => { out[String(n)] = 'started'; });
+    return out;
+  }
+
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => [...document.querySelectorAll(sel)];
 
@@ -99,12 +112,13 @@
 
   function baseState() {
     return {
-      appVersion: 1,
+      appVersion: 2,
       projectName: 'Nessa – Schreibfassung',
       book: null,
       library: {name:'', text:'', baselineText:'', modifiedAt:null},
       revisions: {name:'', text:'', baselineText:'', modifiedAt:null},
       notes: [],
+      chapterStatuses: defaultChapterStatuses(),
       settings: {fontSize:23, showChanges:true},
       metadata: {createdAt: nowIso(), lastSavedAt: nowIso(), baselineAt: null, baselineLabel: 'Importstand'}
     };
@@ -119,7 +133,14 @@
     state.library.baselineText ??= '';
     state.revisions.baselineText ??= '';
     state.notes ||= [];
+    if (!state.chapterStatuses || typeof state.chapterStatuses !== 'object' || Array.isArray(state.chapterStatuses)) {
+      state.chapterStatuses = defaultChapterStatuses();
+    }
+    for (const [key,value] of Object.entries(state.chapterStatuses)) {
+      if (!['open','started','done'].includes(value)) delete state.chapterStatuses[key];
+    }
     state.settings ||= {fontSize:23, showChanges:true};
+    state.appVersion = Math.max(Number(state.appVersion) || 1, 2);
   }
 
   function diffTokens(oldText='', newText='') {
@@ -514,6 +535,7 @@
     block.text = e.currentTarget.innerText.replace(/\u00a0/g,' ');
     block.modifiedAt = nowIso();
     block.changed = block.text !== block.baselineText;
+    markChapterStarted(currentChapter());
     e.currentTarget.classList.toggle('changed', block.changed);
     e.currentTarget.classList.toggle('show-change', state.settings.showChanges);
     dirtySinceSnapshot = true;
@@ -556,6 +578,7 @@
       const neu = {id:uid(`${ch.id}_b`), type:'p', text:text.slice(pos), baselineText:'', changed:true, createdAt:nowIso(), modifiedAt:nowIso()};
       ch.blocks.splice(idx+1, 0, neu);
       activeBlockId = neu.id;
+      markChapterStarted(ch);
       dirtySinceSnapshot = true;
       schedulePersist();
       render();
@@ -577,6 +600,7 @@
         ch.blocks.splice(idx,1);
         state.notes.forEach(n => { if (n.chapterId === ch.id && n.blockId === cur.id) n.blockId = prev.id; });
         activeBlockId = prev.id;
+        markChapterStarted(ch);
         dirtySinceSnapshot = true;
         schedulePersist(); render();
         setTimeout(() => { const el=document.querySelector(`[data-block-id="${CSS.escape(prev.id)}"]`); if(el) placeCaret(el,joinAt); },0);
@@ -606,6 +630,33 @@
     window.scrollTo({top:0, behavior:'instant'});
   }
 
+  function chapterReviewStatus(ch) {
+    return state?.chapterStatuses?.[String(ch.number)] || 'open';
+  }
+
+  function markChapterStarted(ch=currentChapter()) {
+    if (!ch || !state) return;
+    state.chapterStatuses ||= {};
+    const key=String(ch.number);
+    if ((state.chapterStatuses[key] || 'open') === 'open') state.chapterStatuses[key]='started';
+  }
+
+  async function cycleChapterReviewStatus(ch, event) {
+    event?.preventDefault();
+    event?.stopPropagation();
+    if (!state || !ch) return;
+    state.chapterStatuses ||= {};
+    const key=String(ch.number);
+    const current=state.chapterStatuses[key] || 'open';
+    const next=current==='open' ? 'started' : current==='started' ? 'done' : 'open';
+    if (next==='open') delete state.chapterStatuses[key];
+    else state.chapterStatuses[key]=next;
+    await persist(false);
+    renderChapterList(els.chapterSearch.value);
+    const label=next==='done' ? 'fertig bearbeitet' : next==='started' ? 'angefangen' : 'noch nicht bearbeitet';
+    toast(`Kapitel ${ch.number}: ${label}`);
+  }
+
   function renderChapterList(query='') {
     els.chapterList.innerHTML = '';
     if (!state?.book?.chapters) return;
@@ -616,11 +667,31 @@
       const row = document.createElement('div');
       row.className = `chapter-item ${idx===currentChapterIndex?'active':''}`;
       const label = document.createElement('span');
+      label.className='chapter-item-label';
       label.textContent = `${ch.number}. ${ch.title}`;
       row.appendChild(label);
+
+      const meta=document.createElement('span');
+      meta.className='chapter-item-meta';
       if (ch.blocks.some(b => b.type==='p' && b.text !== b.baselineText)) {
-        const dot=document.createElement('span'); dot.className='dot'; dot.title='Geändert'; row.appendChild(dot);
+        const dot=document.createElement('span');
+        dot.className='dot';
+        dot.title='Text seit dem letzten übernommenen Stand geändert';
+        meta.appendChild(dot);
       }
+
+      const status=chapterReviewStatus(ch);
+      const statusBtn=document.createElement('button');
+      statusBtn.type='button';
+      statusBtn.className=`chapter-review-status status-${status}`;
+      statusBtn.textContent=status==='done' ? '✓' : status==='started' ? '◐' : '○';
+      const statusLabel=status==='done' ? 'fertig bearbeitet' : status==='started' ? 'angefangen' : 'noch nicht bearbeitet';
+      statusBtn.title=`${statusLabel} – antippen zum Ändern`;
+      statusBtn.setAttribute('aria-label',`Kapitel ${ch.number}: ${statusLabel}. Antippen zum Ändern.`);
+      statusBtn.addEventListener('click',e=>cycleChapterReviewStatus(ch,e));
+      meta.appendChild(statusBtn);
+      row.appendChild(meta);
+
       row.addEventListener('click', () => goChapter(idx));
       els.chapterList.appendChild(row);
     });
@@ -813,12 +884,14 @@
 
     await createSnapshot('Vor ChatGPT-Rückgabe');
     const oldNotes=clone(state?.notes || []);
+    const oldChapterStatuses=clone(state?.chapterStatuses || defaultChapterStatuses());
     const oldSettings=clone(state?.settings || {fontSize:23,showChanges:true});
     const oldCreatedAt=state?.metadata?.createdAt || nowIso();
     const oldIndex=currentChapterIndex;
 
     const next=baseState();
     next.settings=oldSettings;
+    next.chapterStatuses=oldChapterStatuses;
     next.metadata.createdAt=oldCreatedAt;
     next.book=parseMaster(master,'01_NESSA_SNAPE_ARBEITSMASTER_AKTUELL.md');
     next.library={name:'02_NESSA_SNAPE_STORYBIBLIOTHEK_AKTUELL.md',text:library,baselineText:library,modifiedAt:null};

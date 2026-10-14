@@ -245,3 +245,23 @@ button { -webkit-tap-highlight-color: transparent; }
 .direct-file-import:active {
   transform:translateY(1px);
 }
+
+
+/* Kapitel-Bearbeitungsstand */
+.chapter-item-label { min-width:0; }
+.chapter-item-meta { display:inline-flex; align-items:center; gap:8px; min-width:30px; justify-content:flex-end; }
+.chapter-review-status {
+  width:30px; height:30px; min-width:30px; padding:0; border:0; border-radius:999px;
+  background:transparent; box-shadow:none; font:700 20px/1 system-ui,sans-serif; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+.chapter-review-status.status-open { color:#9a9488; font-weight:500; }
+.chapter-review-status.status-started { color:#a78342; }
+.chapter-review-status.status-done { color:var(--green-dark); }
+.chapter-review-status:active { transform:scale(.92); }
+.chapter-review-status:focus-visible { outline:2px solid var(--green-dark); outline-offset:2px; }
+.chapter-status-legend { margin:8px 2px 2px; color:var(--muted); font:12px/1.4 system-ui,sans-serif; }
+.chapter-status-legend small { display:block; margin-top:2px; font-size:11px; }
+.chapter-status-legend .status-open { color:#9a9488; }
+.chapter-status-legend .status-started { color:#a78342; font-weight:700; }
+.chapter-status-legend .status-done { color:var(--green-dark); font-weight:800; }
