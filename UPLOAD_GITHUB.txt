@@ -1,1 +1,5 @@
-V2: obere Kopfzeile entfernt. Alle Dateien direkt ins Hauptverzeichnis des GitHub-Repositories hochladen und vorhandene Dateien ersetzen. Die private NESSA_PRIVATE_IMPORT_v22.json NICHT zu GitHub hochladen.
+Neue Schreib-App (v10): Lesebereiche Roman | Briefe | Zukunft.
+Alle Dateien aus diesem ZIP in das Hauptverzeichnis des GitHub-Repositories hochladen und vorhandene Dateien ersetzen.
+Das Manuskript NICHT auf GitHub hochladen: Roman, Briefe, Zukunftskapitel und Notizen bleiben lokal im Browser.
+Danach die aktualisierte NESSA_FUER_CHATGPT_...zip über "Überarbeiteten Stand von ChatGPT importieren" laden.
+Bestehende lokale Projektstände bleiben erhalten; vor einem Import ist "Komplette Sicherung" empfohlen.

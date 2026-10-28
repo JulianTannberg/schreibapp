@@ -1,5 +1,5 @@
-const CACHE = 'nessa-writer-v10-chapter-status';
-const SHELL = ['./','./index.html','./styles-v9.css','./app-v9.js','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
+const CACHE = 'nessa-writer-v11-bereiche';
+const SHELL = ['./','./index.html','./styles-v10.css','./app-v10.js','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting()));
 });

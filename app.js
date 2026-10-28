@@ -25,6 +25,7 @@
   const els = {
     empty: $('#emptyState'), chapterView: $('#chapterView'), chapterTitle: $('#chapterTitle'), chapterBody: $('#chapterBody'),
     bookTitle: $('#bookTitle'), saveState: $('#saveState'), chapterCounter: $('#chapterCounter'),
+    sectionTabs: $('#sectionTabs'), sectionEmpty: $('#sectionEmpty'), chapterListTitle: $('#chapterListTitle'),
     menuBtn: $('#menuBtn'), drawerBtn: $('#drawerBtn'), closeDrawerBtn: $('#closeDrawerBtn'), drawer: $('#drawer'), backdrop: $('#drawerBackdrop'),
     editBtn: $('#editBtn'), modeBtn: $('#modeBtn'), prevBtn: $('#prevBtn'), nextBtn: $('#nextBtn'),
     chapterList: $('#chapterList'), chapterSearch: $('#chapterSearch'), followupList: $('#followupList'), snapshotList: $('#snapshotList'),
@@ -41,6 +42,7 @@
   let db;
   let state = null;
   let currentChapterIndex = 0;
+  let activeSection = 'roman';
   let editMode = false;
   let activeBlockId = null;
   let pendingPickerMode = null;
@@ -119,7 +121,7 @@
       revisions: {name:'', text:'', baselineText:'', modifiedAt:null},
       notes: [],
       chapterStatuses: defaultChapterStatuses(),
-      settings: {fontSize:23, showChanges:true},
+      settings: {fontSize:23, showChanges:true, lastSection:'roman', sectionPositions:{}},
       metadata: {createdAt: nowIso(), lastSavedAt: nowIso(), baselineAt: null, baselineLabel: 'Importstand'}
     };
   }
@@ -140,7 +142,10 @@
       if (!['open','started','done'].includes(value)) delete state.chapterStatuses[key];
     }
     state.settings ||= {fontSize:23, showChanges:true};
-    state.appVersion = Math.max(Number(state.appVersion) || 1, 2);
+    state.settings.lastSection ||= 'roman';
+    state.settings.sectionPositions ||= {};
+    migrateLegacyBook();
+    state.appVersion = Math.max(Number(state.appVersion) || 1, 3);
   }
 
   function diffTokens(oldText='', newText='') {
@@ -292,38 +297,99 @@
     }
   }
 
+  // Der Arbeitsmaster enthält drei voneinander getrennte Lesebereiche.
+  // Die Abschnitte vor dem ersten Brief/Zukunftskapitel bleiben als eigenes
+  // Vorwort erhalten, statt dem letzten Romankapitel zugeschlagen zu werden.
   function parseMaster(text, sourceName='Arbeitsmaster.md') {
     const normalized = text.replace(/\r\n?/g, '\n');
-    const re = /^##\s+Kapitel\s+(\d+)\s*[–—-]\s*(.+?)\s*$/gm;
+    const re = /^##[ \t]+(?:Kapitel[ \t]+(\d+|[A-Z]{2,})[ \t]*[–—-][ \t]*(.+?)|Brief[ \t]+([IVXLCDM]+)(?:[ \t]*[–—-][ \t]*(.+?))?)[ \t]*$/gm;
     const matches = [...normalized.matchAll(re)];
-    if (!matches.length) throw new Error('Keine Kapitelüberschriften im Format „## Kapitel 1 – Titel“ gefunden.');
+    if (!matches.length) throw new Error('Keine Kapitelüberschriften im Arbeitsmaster gefunden.');
     const preamble = normalized.slice(0, matches[0].index).trimEnd();
+    const introductions = {letters:'',future:''};
     const chapters = matches.map((m, idx) => {
+      const isLetter = !!m[3];
+      const number = isLetter ? m[3] : /^\d+$/.test(m[1]) ? Number(m[1]) : m[1];
+      const section = isLetter ? 'letters' : typeof number === 'number' ? 'roman' : 'future';
       const start = m.index + m[0].length;
       const end = idx + 1 < matches.length ? matches[idx+1].index : normalized.length;
-      const body = normalized.slice(start, end).replace(/^\s*\n/, '').trimEnd();
+      let raw = normalized.slice(start, end).replace(/^\s*\n/, '');
+      const next = matches[idx+1];
+      if (next) {
+        const nextSection = next[3] ? 'letters' : /^\d+$/.test(next[1]) ? 'roman' : 'future';
+        if (nextSection !== section) {
+          const headingOffset = raw.search(/^#\s+(?:ARBEITSANHANG|ANHANG)\b/gm);
+          if (headingOffset >= 0) {
+            introductions[nextSection] = raw.slice(headingOffset).trim();
+            raw = raw.slice(0, headingOffset);
+          }
+        }
+      }
+      const body = raw.trimEnd();
       const rawBlocks = body ? body.split(/\n\s*\n+/) : [];
-      const chapterId = `chapter_${m[1]}`;
+      const chapterId = isLetter ? `letter_${number}` : `chapter_${number}`;
       const blocks = rawBlocks.map((raw, bi) => {
-        const text = raw.trimEnd();
-        const sep = /^---+$/.test(text.trim());
-        return {id:`${chapterId}_b${bi+1}`, type:sep?'sep':'p', text:sep?'---':text, baselineText:sep?'---':text, changed:false, createdAt:nowIso(), modifiedAt:null};
+        const value = raw.trimEnd();
+        const sep = /^---+$/.test(value.trim());
+        return {id:`${chapterId}_b${bi+1}`, type:sep?'sep':'p', text:sep?'---':value, baselineText:sep?'---':value, changed:false, createdAt:nowIso(), modifiedAt:null};
       });
-      return {id:chapterId, number:Number(m[1]), title:m[2].trim(), heading:m[0], blocks};
+      return {id:chapterId, section, number, title:(isLetter ? m[4] : m[2])?.trim() || '', heading:m[0], blocks};
     });
-    return {sourceName, preamble, chapters, importedAt:nowIso()};
+    return {sourceName, preamble, introductions, chapters, sectionVersion:1, importedAt:nowIso()};
   }
 
+  function sectionOf(ch) {
+    return ch?.section || (String(ch?.id || '').startsWith('letter_') ? 'letters' : typeof ch?.number === 'number' ? 'roman' : 'future');
+  }
+  function chapterHeading(ch) {
+    return sectionOf(ch)==='letters'
+      ? `Brief ${ch.number}${ch.title ? ` – ${ch.title}` : ''}`
+      : `Kapitel ${ch.number} – ${ch.title}`;
+  }
+  function chapterLabel(ch) {
+    return sectionOf(ch)==='letters'
+      ? `Brief ${ch.number}${ch.title ? ` – ${ch.title}` : ''}`
+      : sectionOf(ch)==='future' ? `${ch.number} – ${ch.title}` : `${ch.number}. ${ch.title}`;
+  }
   function buildMaster(book) {
     if (!book) return '';
     const parts = [];
     if (book.preamble) parts.push(book.preamble.trimEnd());
-    for (const chapter of book.chapters) {
-      const heading = `## Kapitel ${chapter.number} – ${chapter.title}`;
-      const body = chapter.blocks.map(b => b.type === 'sep' ? '---' : b.text).join('\n\n');
-      parts.push(`${heading}\n\n${body}`.trimEnd());
+    for (const section of ['roman','letters','future']) {
+      const list=book.chapters.filter(ch=>sectionOf(ch)===section);
+      if (!list.length) continue;
+      if (section!=='roman' && book.introductions?.[section]) parts.push(book.introductions[section].trimEnd());
+      for (const chapter of list) {
+        const heading = `## ${chapterHeading(chapter)}`;
+        const body = chapter.blocks.map(b => b.type === 'sep' ? '---' : b.text).join('\n\n');
+        parts.push(`${heading}\n\n${body}`.trimEnd());
+      }
     }
     return parts.join('\n\n\n') + '\n';
+  }
+
+  // Vorhandene lokale Stände der v9 enthielten alle Anhänge im letzten
+  // Romankapitel. Bestehende Bearbeitungen der Romankapitel beibehalten.
+  function migrateLegacyBook() {
+    if (!state?.book?.chapters?.length || state.book.sectionVersion) return;
+    const oldBook=state.book;
+    const last=oldBook.chapters.at(-1);
+    if (!last?.blocks?.some(b => /^## Brief [IVXLCDM]+$|^# (?:ARBEITSANHANG|ANHANG)\b/m.test(b.text))) {
+      oldBook.chapters.forEach(ch=>{ ch.section ||= sectionOf(ch); });
+      oldBook.sectionVersion=1;
+      oldBook.introductions ||= {letters:'',future:''};
+      return;
+    }
+    const parsed=parseMaster(buildMaster(oldBook),oldBook.sourceName);
+    const oldById=new Map(oldBook.chapters.map(ch=>[ch.id,ch]));
+    for (const ch of parsed.chapters) {
+      const old=oldById.get(ch.id);
+      if (!old || sectionOf(ch)!=='roman') continue;
+      if (ch.id!==last.id) { ch.blocks=old.blocks; continue; }
+      const cut=old.blocks.findIndex(b=>/^# (?:ARBEITSANHANG|ANHANG)\b|^## Brief [IVXLCDM]+$/m.test(b.text));
+      if (cut>=0) ch.blocks=old.blocks.slice(0,cut);
+    }
+    state.book=parsed;
   }
 
   function changedBlocks() {
@@ -386,50 +452,103 @@
     return block.text.replace(/\s+/g,' ').trim().slice(0,max) + (block.text.length > max ? ' …' : '');
   }
 
+  function sectionIndices(section=activeSection) {
+    if (!state?.book?.chapters) return [];
+    return state.book.chapters.map((ch,idx)=>sectionOf(ch)===section?idx:-1).filter(idx=>idx>=0);
+  }
+  function alignCurrentChapter() {
+    if (!state?.book?.chapters?.length) return;
+    const indices=sectionIndices();
+    if (!indices.length) return;
+    if (!indices.includes(currentChapterIndex)) {
+      const saved=state.settings?.sectionPositions?.[activeSection];
+      const found=indices.find(idx=>state.book.chapters[idx].id===saved);
+      currentChapterIndex=found===undefined?indices[0]:found;
+    }
+  }
+  async function changeSection(section) {
+    if (!['roman','letters','future'].includes(section) || !state?.book) return;
+    if (section===activeSection) return;
+    if (editMode) await maybeSnapshot('Vor Wechsel des Lesebereichs');
+    state.settings.sectionPositions[activeSection]=currentChapter()?.id;
+    activeSection=section;
+    state.settings.lastSection=section;
+    const positions=sectionIndices(section);
+    const saved=state.settings.sectionPositions[section];
+    currentChapterIndex=positions.find(idx=>state.book.chapters[idx].id===saved) ?? positions[0] ?? -1;
+    activeBlockId=null;
+    pendingEditSelection=null;
+    await persist(false);
+    render(); closeDrawer();
+    window.scrollTo({top:0,behavior:'instant'});
+  }
   function render() {
-    if (!state?.book?.chapters?.length) {
+    const hasBook=!!state?.book?.chapters?.length;
+    els.sectionTabs.classList.toggle('hidden',!hasBook);
+    for (const section of ['roman','letters','future']) {
+      const btn=els.sectionTabs.querySelector(`[data-section="${section}"]`);
+      btn.classList.toggle('active',section===activeSection);
+      btn.setAttribute('aria-pressed',String(section===activeSection));
+      const count=sectionIndices(section).length;
+      const countEl=$(`#${section}Count`);
+      if (countEl) countEl.textContent=count ? String(count) : '';
+    }
+    els.chapterListTitle.textContent=activeSection==='roman'?'Roman · Kapitel':activeSection==='letters'?'Briefe':'Zukunftskapitel';
+    if (!hasBook) {
       els.empty.classList.remove('hidden');
+      els.sectionEmpty.classList.add('hidden');
       els.chapterView.classList.add('hidden');
-      els.chapterCounter.textContent = '–';
-      els.prevBtn.disabled = true; els.nextBtn.disabled = true;
+      els.chapterCounter.textContent='–';
+      els.prevBtn.disabled=true; els.nextBtn.disabled=true;
       renderChapterList(); renderFollowups(); renderProjectStatus();
       return;
     }
     els.empty.classList.add('hidden');
+    alignCurrentChapter();
+    const indices=sectionIndices();
+    if (!indices.length) {
+      els.sectionEmpty.classList.remove('hidden');
+      els.sectionEmpty.textContent=activeSection==='letters'?'Noch keine Briefe im importierten Arbeitsmaster.': 'Noch keine Zukunftskapitel im importierten Arbeitsmaster.';
+      els.chapterView.classList.add('hidden');
+      els.chapterCounter.textContent='0 von 0';
+      els.prevBtn.disabled=true; els.nextBtn.disabled=true;
+      renderChapterList(); renderFollowups(); renderProjectStatus();
+      return;
+    }
+    els.sectionEmpty.classList.add('hidden');
     els.chapterView.classList.remove('hidden');
-    const ch = currentChapter();
-    els.chapterTitle.textContent = `Kapitel ${ch.number} – ${ch.title}`;
-    els.chapterCounter.textContent = `${currentChapterIndex+1} von ${state.book.chapters.length}`;
-    els.prevBtn.disabled = currentChapterIndex === 0;
-    els.nextBtn.disabled = currentChapterIndex === state.book.chapters.length - 1;
-    els.chapterBody.innerHTML = '';
+    const ch=currentChapter();
+    const sectionOffset=indices.indexOf(currentChapterIndex);
+    els.chapterTitle.textContent=chapterHeading(ch);
+    els.chapterCounter.textContent=`${sectionOffset+1} von ${indices.length}`;
+    els.prevBtn.disabled=sectionOffset===0;
+    els.nextBtn.disabled=sectionOffset===indices.length-1;
+    els.chapterBody.innerHTML='';
     for (const block of ch.blocks) {
-      const div = document.createElement('div');
-      div.dataset.blockId = block.id;
-      div.className = `book-block ${block.type === 'sep' ? 'separator' : ''}`;
-      const changed = block.type === 'p' && block.text !== block.baselineText;
+      const div=document.createElement('div');
+      div.dataset.blockId=block.id;
+      div.className=`book-block ${block.type==='sep'?'separator':''}`;
+      const changed=block.type==='p' && block.text!==block.baselineText;
       if (changed) div.classList.add('changed');
       if (state.settings.showChanges) div.classList.add('show-change');
-      if (block.id === activeBlockId) div.classList.add('selected');
-      if (block.type === 'sep') {
-        div.textContent = '• • •';
+      if (block.id===activeBlockId) div.classList.add('selected');
+      if (block.type==='sep') {
+        div.textContent='• • •';
       } else {
-        if (state.settings.showChanges && changed && !editMode) renderDiffInto(div, block.baselineText || '', block.text);
-        else div.textContent = block.text;
+        if (state.settings.showChanges && changed && !editMode) renderDiffInto(div,block.baselineText||'',block.text);
+        else div.textContent=block.text;
         if (editMode) {
-          div.contentEditable = 'true';
-          div.spellcheck = true;
-          div.addEventListener('input', onBlockInput);
-          div.addEventListener('keydown', onBlockKeydown);
-        } else {
-          div.addEventListener('pointerdown', e => rememberEditPoint(e, div));
-        }
-        div.addEventListener('click', () => selectBlock(block.id));
+          div.contentEditable='true';
+          div.spellcheck=true;
+          div.addEventListener('input',onBlockInput);
+          div.addEventListener('keydown',onBlockKeydown);
+        } else div.addEventListener('pointerdown',e=>rememberEditPoint(e,div));
+        div.addEventListener('click',()=>selectBlock(block.id));
       }
       els.chapterBody.appendChild(div);
     }
-    els.modeBtn.textContent = editMode ? '✓' : '✎';
-    els.editBtn.textContent = editMode ? '✓' : '✎';
+    els.modeBtn.textContent=editMode?'✓':'✎';
+    els.editBtn.textContent=editMode?'✓':'✎';
     renderChapterList(els.chapterSearch.value);
     renderFollowups();
     renderProjectStatus();
@@ -621,23 +740,35 @@
 
   async function goChapter(index) {
     if (!state?.book) return;
-    if (editMode) await maybeSnapshot(`Vor Kapitelwechsel von Kapitel ${currentChapter()?.number || ''}`);
-    currentChapterIndex = Math.max(0, Math.min(index, state.book.chapters.length-1));
-    activeBlockId = null;
-    pendingEditSelection = null;
+    const allowed=sectionIndices();
+    if (!allowed.length) return;
+    if (editMode) await maybeSnapshot(`Vor Kapitelwechsel von ${chapterHeading(currentChapter())}`);
+    currentChapterIndex=allowed.includes(index) ? index : index < currentChapterIndex
+      ? allowed[Math.max(0,allowed.indexOf(currentChapterIndex)-1)]
+      : allowed[Math.min(allowed.length-1,allowed.indexOf(currentChapterIndex)+1)];
+    state.settings.sectionPositions[activeSection]=currentChapter()?.id;
+    schedulePersist();
+    activeBlockId=null;
+    pendingEditSelection=null;
     render();
     closeDrawer();
-    window.scrollTo({top:0, behavior:'instant'});
+    window.scrollTo({top:0,behavior:'instant'});
+  }
+  async function relativeChapter(delta) {
+    const indices=sectionIndices();
+    const offset=indices.indexOf(currentChapterIndex);
+    const next=indices[offset+delta];
+    if (next!==undefined) await goChapter(next);
   }
 
   function chapterReviewStatus(ch) {
-    return state?.chapterStatuses?.[String(ch.number)] || 'open';
+    return state?.chapterStatuses?.[sectionOf(ch)==='roman' ? String(ch.number) : ch.id] || 'open';
   }
 
   function markChapterStarted(ch=currentChapter()) {
     if (!ch || !state) return;
     state.chapterStatuses ||= {};
-    const key=String(ch.number);
+    const key=sectionOf(ch)==='roman' ? String(ch.number) : ch.id;
     if ((state.chapterStatuses[key] || 'open') === 'open') state.chapterStatuses[key]='started';
   }
 
@@ -646,7 +777,7 @@
     event?.stopPropagation();
     if (!state || !ch) return;
     state.chapterStatuses ||= {};
-    const key=String(ch.number);
+    const key=sectionOf(ch)==='roman' ? String(ch.number) : ch.id;
     const current=state.chapterStatuses[key] || 'open';
     const next=current==='open' ? 'started' : current==='started' ? 'done' : 'open';
     if (next==='open') delete state.chapterStatuses[key];
@@ -654,7 +785,7 @@
     await persist(false);
     renderChapterList(els.chapterSearch.value);
     const label=next==='done' ? 'fertig bearbeitet' : next==='started' ? 'angefangen' : 'noch nicht bearbeitet';
-    toast(`Kapitel ${ch.number}: ${label}`);
+    toast(`${chapterHeading(ch)}: ${label}`);
   }
 
   function renderChapterList(query='') {
@@ -662,13 +793,14 @@
     if (!state?.book?.chapters) return;
     const q = query.trim().toLocaleLowerCase('de');
     state.book.chapters.forEach((ch, idx) => {
+      if (sectionOf(ch)!==activeSection) return;
       const hay = `${ch.number} ${ch.title} ${ch.blocks.map(b=>b.text).join(' ')}`.toLocaleLowerCase('de');
       if (q && !hay.includes(q)) return;
       const row = document.createElement('div');
       row.className = `chapter-item ${idx===currentChapterIndex?'active':''}`;
       const label = document.createElement('span');
       label.className='chapter-item-label';
-      label.textContent = `${ch.number}. ${ch.title}`;
+      label.textContent = chapterLabel(ch);
       row.appendChild(label);
 
       const meta=document.createElement('span');
@@ -687,7 +819,7 @@
       statusBtn.textContent=status==='done' ? '✓' : status==='started' ? '◐' : '○';
       const statusLabel=status==='done' ? 'fertig bearbeitet' : status==='started' ? 'angefangen' : 'noch nicht bearbeitet';
       statusBtn.title=`${statusLabel} – antippen zum Ändern`;
-      statusBtn.setAttribute('aria-label',`Kapitel ${ch.number}: ${statusLabel}. Antippen zum Ändern.`);
+      statusBtn.setAttribute('aria-label',`${chapterHeading(ch)}: ${statusLabel}. Antippen zum Ändern.`);
       statusBtn.addEventListener('click',e=>cycleChapterReviewStatus(ch,e));
       meta.appendChild(statusBtn);
       row.appendChild(meta);
@@ -734,11 +866,11 @@
       const ch = state.book?.chapters.find(c => c.id===note.chapterId);
       const block = ch?.blocks.find(b => b.id===note.blockId);
       const card=document.createElement('div'); card.className='followup-card';
-      card.innerHTML = `<strong>Kapitel ${ch?.number ?? '?'}</strong><div></div><small></small>`;
+      card.innerHTML = `<strong>${ch ? escapeHtml(chapterHeading(ch)) : '?'}</strong><div></div><small></small>`;
       card.querySelector('div').textContent = note.text;
       card.querySelector('small').textContent = blockExcerpt(block,90);
       const go=document.createElement('button'); go.textContent='Zur Stelle'; go.addEventListener('click',()=>{
-        const idx=state.book.chapters.findIndex(c=>c.id===note.chapterId); if(idx>=0){ currentChapterIndex=idx; activeBlockId=note.blockId; render(); closeDrawer(); setTimeout(()=>document.querySelector(`[data-block-id="${CSS.escape(note.blockId)}"]`)?.scrollIntoView({block:'center'}),50); }
+        const idx=state.book.chapters.findIndex(c=>c.id===note.chapterId); if(idx>=0){ activeSection=sectionOf(state.book.chapters[idx]); state.settings.lastSection=activeSection; currentChapterIndex=idx; state.settings.sectionPositions[activeSection]=state.book.chapters[idx].id; activeBlockId=note.blockId; schedulePersist(); render(); closeDrawer(); setTimeout(()=>document.querySelector(`[data-block-id="${CSS.escape(note.blockId)}"]`)?.scrollIntoView({block:'center'}),50); }
       });
       const done=document.createElement('button'); done.textContent='Erledigt'; done.addEventListener('click',async()=>{ note.resolved=true; note.resolvedAt=nowIso(); await persist(false); renderFollowups(); });
       card.append(go, done); els.followupList.appendChild(card);
@@ -801,7 +933,7 @@
     const ok = await confirmBox('Version wiederherstellen', `Stand vom ${humanTime(snap.createdAt)} wiederherstellen? Der aktuelle Stand wird vorher zusätzlich gesichert.`);
     if (!ok) return;
     await createSnapshot('Vor Wiederherstellung');
-    state=clone(snap.state); await persist(false); currentChapterIndex=0; activeBlockId=null; editMode=false; render(); closeDrawer(); toast('Version wiederhergestellt');
+    state=clone(snap.state); ensureStateShape(); activeSection=state.settings.lastSection || 'roman'; currentChapterIndex=0; alignCurrentChapter(); await persist(false); activeBlockId=null; editMode=false; render(); closeDrawer(); toast('Version wiederhergestellt');
   }
 
   function openDrawer(){ els.drawer.classList.add('open'); els.backdrop.classList.remove('hidden'); renderFollowups(); renderSnapshots(); }
@@ -916,7 +1048,10 @@
     next.metadata.baselineAt=nowIso();
     next.metadata.baselineLabel=manifest?.label || `ChatGPT-Rückgabe ${file.name}`;
     state=next;
+    ensureStateShape();
+    activeSection=['roman','letters','future'].includes(state.settings.lastSection)?state.settings.lastSection:'roman';
     currentChapterIndex=Math.min(oldIndex, Math.max(0,(state.book?.chapters?.length||1)-1));
+    alignCurrentChapter();
     activeBlockId=null;
     pendingEditSelection=null;
     editMode=false;
@@ -947,7 +1082,7 @@
     if (!state) state=baseState();
     if (pendingPickerMode==='master') {
       await maybeSnapshot('Vor neuem Arbeitsmaster');
-      state.book=parseMaster(text,file.name); currentChapterIndex=0; activeBlockId=null;
+      state.book=parseMaster(text,file.name); activeSection='roman'; state.settings.lastSection='roman'; state.settings.sectionPositions={}; currentChapterIndex=0; activeBlockId=null;
       state.metadata.baselineAt=nowIso(); state.metadata.baselineLabel=`Import ${file.name}`;
       dirtySinceSnapshot=false; await persist(false); render(); await createSnapshot('Arbeitsmaster importiert'); toast(`${state.book.chapters.length} Kapitel lokal importiert`);
     } else if (pendingPickerMode==='library') {
@@ -971,7 +1106,8 @@
       throw new Error('Diese Datei ist keine Nessa-Sicherung bzw. kein privates Importpaket.');
     }
     ensureStateShape();
-    currentChapterIndex=0; activeBlockId=null; editMode=false; dirtySinceSnapshot=false;
+    activeSection=['roman','letters','future'].includes(state.settings.lastSection)?state.settings.lastSection:'roman';
+    currentChapterIndex=0; alignCurrentChapter(); activeBlockId=null; editMode=false; dirtySinceSnapshot=false;
     await persist(false); applySettings(); render(); await createSnapshot('Privater Projektstand importiert'); toast('Privater Projektstand lokal geladen');
   }
 
@@ -1040,13 +1176,13 @@
       'Diese ZIP stammt aus der lokalen Nessa-Schreib-PWA. Sie enthält immer vier Dateien: diese Änderungs-/Folgeprüfungsdatei, den aktuellen Arbeitsmaster, die aktuelle Storybibliothek und den aktuellen Revisionsstand. Bitte prüfe offene Folgeprüfungen im gesamten Arbeitsmaster und – soweit relevant – in Storybibliothek und Revisionsstand.','');
     lines.push('## Offene Folgeprüfungen','');
     if(!open.length) lines.push('_Keine offenen Folgeprüfungen._','');
-    for(const n of open){ const ch=state.book.chapters.find(c=>c.id===n.chapterId); const b=ch?.blocks.find(x=>x.id===n.blockId); lines.push(`### Kapitel ${ch?.number ?? '?'} – ${ch?.title ?? ''}`,`**ID:** ${n.id}`,`**Hinweis:** ${n.text}`,`**Bezug:** ${blockExcerpt(b,260)}`,''); }
+    for(const n of open){ const ch=state.book.chapters.find(c=>c.id===n.chapterId); const b=ch?.blocks.find(x=>x.id===n.blockId); lines.push(`### ${ch?chapterHeading(ch):'Unbekannter Text'}`,`**ID:** ${n.id}`,`**Hinweis:** ${n.text}`,`**Bezug:** ${blockExcerpt(b,260)}`,''); }
     lines.push('## Eigene Notizen','');
     if(!ownNotes.length) lines.push('_Keine zusätzlichen Notizen._','');
-    for(const n of ownNotes){ const ch=state.book.chapters.find(c=>c.id===n.chapterId); const b=ch?.blocks.find(x=>x.id===n.blockId); lines.push(`### Kapitel ${ch?.number ?? '?'} – ${ch?.title ?? ''}`,`**ID:** ${n.id}`,`**Notiz:** ${n.text}`,`**Bezug:** ${blockExcerpt(b,260)}`,''); }
+    for(const n of ownNotes){ const ch=state.book.chapters.find(c=>c.id===n.chapterId); const b=ch?.blocks.find(x=>x.id===n.blockId); lines.push(`### ${ch?chapterHeading(ch):'Unbekannter Text'}`,`**ID:** ${n.id}`,`**Notiz:** ${n.text}`,`**Bezug:** ${blockExcerpt(b,260)}`,''); }
     lines.push('## Eigene Änderungen am Roman seit dem Basisstand','');
     if(!changes.length) lines.push('_Keine lokal markierten Textänderungen seit dem Basisstand._','');
-    for(const {chapter,block} of changes){ lines.push(`### Kapitel ${chapter.number} – ${chapter.title}`,`**Vorher:** ${block.baselineText || '— neu eingefügt —'}`,`**Jetzt:** ${block.text}`,''); }
+    for(const {chapter,block} of changes){ lines.push(`### ${chapterHeading(chapter)}`,`**Vorher:** ${block.baselineText || '— neu eingefügt —'}`,`**Jetzt:** ${block.text}`,''); }
     lines.push('## Weitere Projektdokumente','');
     lines.push(`- Storybibliothek: ${state.library.text !== (state.library.baselineText ?? state.library.text) ? 'seit Basisstand geändert' : 'keine lokale Änderung markiert'}`);
     lines.push(`- Revisionsstand: ${state.revisions.text !== (state.revisions.baselineText ?? state.revisions.text) ? 'seit Basisstand geändert' : 'keine lokale Änderung markiert'}`);
@@ -1085,10 +1221,10 @@
   }
 
   function openNote(type){
-    if(!state?.book) return toast('Zuerst ein Buch importieren');
+    if(!state?.book || !currentChapter()) return toast('Zuerst einen Text öffnen');
     pendingNoteType=type; const block=currentBlock();
     els.noteDialogTitle.textContent=type==='followup'?'Folgeänderung prüfen':'Notiz';
-    els.noteContext.textContent=block?`Bezug: ${blockExcerpt(block,180)}`:`Bezug: Kapitel ${currentChapter().number}`;
+    els.noteContext.textContent=block?`Bezug: ${blockExcerpt(block,180)}`:`Bezug: ${chapterHeading(currentChapter())}`;
     els.noteText.value=''; els.noteDialog.showModal(); setTimeout(()=>els.noteText.focus(),50);
   }
 
@@ -1142,7 +1278,8 @@
   function bindEvents(){
     els.menuBtn.addEventListener('click',openDrawer); els.drawerBtn.addEventListener('click',openDrawer); els.closeDrawerBtn.addEventListener('click',closeDrawer); els.backdrop.addEventListener('click',closeDrawer);
     els.editBtn.addEventListener('click',()=>setEditMode(!editMode)); els.modeBtn.addEventListener('click',()=>setEditMode(!editMode));
-    els.prevBtn.addEventListener('click',()=>goChapter(currentChapterIndex-1)); els.nextBtn.addEventListener('click',()=>goChapter(currentChapterIndex+1));
+    els.prevBtn.addEventListener('click',()=>relativeChapter(-1)); els.nextBtn.addEventListener('click',()=>relativeChapter(1));
+    els.sectionTabs.addEventListener('click',e=>{ const btn=e.target.closest('button[data-section]'); if(btn) changeSection(btn.dataset.section); });
     els.chapterSearch.addEventListener('input',()=>renderChapterList(els.chapterSearch.value));
     document.addEventListener('click',e=>{ const btn=e.target.closest('[data-action]'); if(btn) action(btn.dataset.action); });
     els.filePicker.addEventListener('change',async()=>{ try{ await handleFile(els.filePicker.files[0]); }catch(err){ console.error(err); toast(err.message || 'Import fehlgeschlagen'); } });
@@ -1171,7 +1308,11 @@
   async function init(){
     db=await openDb();
     state=await dbGet('state',PROJECT_KEY) || baseState();
+    const migrateOnLoad=!!state.book?.chapters?.length && !state.book.sectionVersion;
     ensureStateShape();
+    if (migrateOnLoad) await persist(false);
+    activeSection=['roman','letters','future'].includes(state.settings.lastSection)?state.settings.lastSection:'roman';
+    alignCurrentChapter();
     applySettings(); bindEvents(); render(); renderProjectStatus(); renderSnapshots();
     if('serviceWorker' in navigator){ try{ await navigator.serviceWorker.register('./sw.js'); }catch(err){ console.warn('Service Worker konnte nicht registriert werden',err); } }
   }

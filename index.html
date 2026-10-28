@@ -8,7 +8,7 @@
   <title>Nessa – Schreibfassung</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="icon-192.png" />
-  <link rel="stylesheet" href="styles-v9.css" />
+  <link rel="stylesheet" href="styles-v10.css" />
 </head>
 <body>
   <div id="app" class="app-shell">
@@ -22,6 +22,12 @@
     </header>
 
     <main id="reader" class="reader" aria-live="polite">
+      <nav id="sectionTabs" class="section-tabs hidden" aria-label="Lesebereich">
+        <button type="button" data-section="roman" aria-pressed="true">Roman <span id="romanCount"></span></button>
+        <button type="button" data-section="letters" aria-pressed="false">Briefe <span id="lettersCount"></span></button>
+        <button type="button" data-section="future" aria-pressed="false">Zukunft <span id="futureCount"></span></button>
+      </nav>
+      <section id="sectionEmpty" class="section-empty hidden" aria-live="polite"></section>
       <section id="emptyState" class="empty-state">
         <h1>Dein Buch bleibt auf diesem Gerät.</h1>
         <p>Die App selbst enthält keinen Romantext. Importiere deinen privaten Projektstand direkt vom Handy. Die Datei wird nur lokal gelesen und in diesem Browser gespeichert.</p>
@@ -54,8 +60,8 @@
       </div>
 
       <section class="drawer-section">
-        <h2>Kapitel</h2>
-        <div class="search-wrap"><input id="chapterSearch" type="search" placeholder="Kapitel oder Text suchen …" /></div>
+        <h2 id="chapterListTitle">Roman · Kapitel</h2>
+        <div class="search-wrap"><input id="chapterSearch" type="search" placeholder="Titel oder Text suchen …" /></div>
         <p class="chapter-status-legend"><span class="status-open">○</span> offen · <span class="status-started">◐</span> angefangen · <span class="status-done">✓</span> fertig <small>– Zeichen antippen zum Ändern</small></p>
         <div id="chapterList" class="chapter-list"></div>
       </section>
@@ -165,6 +171,6 @@
     <input id="filePicker" type="file" class="hidden" />
     <div id="toast" class="toast hidden" role="status"></div>
   </div>
-  <script src="app-v9.js" defer></script>
+  <script src="app-v10.js" defer></script>
 </body>
 </html>
