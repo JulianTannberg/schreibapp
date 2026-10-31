@@ -1,0 +1,99 @@
+/* Mein Kräuterwissen – v64. Offline und im bestehenden Tracker-Speicher. */
+(function(){
+  "use strict";
+  const HERBS = [
+    {id:"beifuss",name:"Beifuß",latin:"Artemisia vulgaris",tags:["tradition","wild"],intro:"Heimische Wildpflanze mit silbrig-heller Blattunterseite.",grow:"Sonnig bis halbschattig; die robuste Staude kann groß werden. Im Garten am besten mit ausreichend Platz.",harvest:"Traditionell werden oberirdische Pflanzenteile vor oder während der Blüte gesammelt und luftig getrocknet.",use:"Als Gewürz traditionell sparsam zu deftigen Gerichten; nicht mit unbekannten Wildpflanzen verwechseln.",tradition:"Beifuß ist eines der bekannten heimischen Räucherkräuter. Er wurde in Kräuterbündeln und bei Jahreskreisbräuchen verwendet. Ein getrocknetes Bündel eignet sich auch als Dekoration.",caution:"In Schwangerschaft nicht als Heilmittel verwenden; bei Korbblütlerallergie Vorsicht. Rauch kann Atemwege reizen."},
+    {id:"rosmarin",name:"Rosmarin",latin:"Salvia rosmarinus",tags:["kueche","tradition"],intro:"Immergrüner mediterraner Strauch mit nadelförmigen Blättern.",grow:"Viel Sonne, durchlässige Erde, im Kübel guter Wasserabzug. Winterkälte und Staunässe beachten.",harvest:"Triebspitzen bei Bedarf schneiden; die Zweige können an einem luftigen, schattigen Ort trocknen.",use:"Sparsam an Ofenkartoffeln, Gemüse, Brot oder Öl zum sofortigen Kochen.",tradition:"Der kräftige Duft wird in Kräuter- und Duftsäckchen geschätzt; in einigen Traditionen auch als Räucherkraut.",caution:"Ätherisches Öl ist viel konzentrierter als das Kraut und nicht für eigenständige Anwendungen gedacht."},
+    {id:"thymian",name:"Thymian",latin:"Thymus vulgaris",tags:["kueche","tradition"],intro:"Kleine aromatische Blätter und zarte Blüten.",grow:"Sonnig, warm und eher trocken; magerer, durchlässiger Boden ist günstig.",harvest:"Junge Triebspitzen vor oder während der Blüte schneiden; luftig trocknen.",use:"Passt zu Ofengemüse, Kartoffeln, Pilzen und Kräuterdressings.",tradition:"Traditionelles Duftkraut; blühender Thymian ist zugleich Nahrung für Insekten.",caution:"Stark konzentrierte ätherische Öle können Haut und Atemwege reizen."},
+    {id:"salbei",name:"Salbei",latin:"Salvia officinalis",tags:["kueche","tradition"],intro:"Weiche, oft graugrüne Blätter mit kräftigem Duft.",grow:"Sonniger, geschützter Standort; gut drainierter Boden, nicht zu nass.",harvest:"Blätter nach Bedarf ernten und schattig trocknen.",use:"Wenige Blätter können Butter, Gemüse oder Gnocchi aromatisieren.",tradition:"Küchensalbei spielt in alten Duft- und Räucherbräuchen eine Rolle. Ein Trockenbündel kann als Kräuterdekoration dienen.",caution:"Nicht mit unbekannten Salbeiarten verwechseln. Ätherisches Salbeiöl nicht unverdünnt anwenden."},
+    {id:"lavendel",name:"Lavendel",latin:"Lavandula angustifolia",tags:["tradition"],intro:"Silbrig-grüne Blätter und meist violette, aromatische Blüten.",grow:"Viel Sonne und durchlässigen, eher trockenen Boden wählen.",harvest:"Blütenähren kurz vor dem vollen Aufblühen schneiden und luftig trocknen.",use:"Getrocknete Blüten in Duftsäckchen, kleinen Kränzen oder als Dekoration.",tradition:"Duftpflanze für Kräuterbündel und historische Raumduft-Bräuche.",caution:"Duftstoffe können empfindliche Menschen und Haustiere beeinträchtigen; intensive Öle vermeiden."},
+    {id:"pfefferminze",name:"Pfefferminze",latin:"Mentha × piperita",tags:["kueche"],intro:"Frischer Mentholduft; breitet sich oft durch Ausläufer aus.",grow:"Feuchte, nährstoffreiche Erde und Sonne bis Halbschatten. Im Topf leichter begrenzbar.",harvest:"Blätter und Triebspitzen vor der Blüte sammeln; schattig trocknen oder frisch nutzen.",use:"Für kaltes Kräuterwasser, Fruchtgerichte oder als Küchengewürz.",tradition:"Minze gehört seit langem zu den Duft- und Gartenkräutern.",caution:"Bei empfindlichem Magen kann starke Minze Beschwerden verstärken."},
+    {id:"zitronenmelisse",name:"Zitronenmelisse",latin:"Melissa officinalis",tags:["kueche","tradition"],intro:"Weiche Blätter mit angenehmem Zitronenduft.",grow:"Sonnig bis halbschattig; kann sich durch Samen ausbreiten.",harvest:"Junge Blätter ernten; zum Trocknen luftige, schattige Plätze nutzen.",use:"Frisch in Wasser, Desserts und Obstsalat; Aroma leidet bei langem Kochen.",tradition:"Bekanntes Duft- und Klostergartenkraut.",caution:"Nur eindeutig bestimmte, sauber gewachsene Pflanzen verwenden."},
+    {id:"oregano",name:"Oregano",latin:"Origanum vulgare",tags:["kueche"],intro:"Würziges Kraut und attraktive Blütenpflanze für Insekten.",grow:"Sonne und durchlässiger, eher magerer Boden.",harvest:"Kurz vor oder zur Blüte schneiden und schonend trocknen.",use:"Zu Pizza, Gemüse, Kartoffeln und mediterranen Gerichten.",tradition:"In vielen mediterranen Küchen fester Bestandteil.",caution:"Nicht alle Zier-Oregano-Sorten sind gleich aromatisch."},
+    {id:"majoran",name:"Majoran",latin:"Origanum majorana",tags:["kueche"],intro:"Verwandt mit Oregano, aber meist milder und wärmer im Aroma.",grow:"Warmer, sonniger Standort; je nach Klima einjährig kultiviert.",harvest:"Triebspitzen vor der Blüte schneiden; Blätter trocknen.",use:"Zu Kartoffeln, Hülsenfrüchten und herzhaften Speisen.",tradition:"Klassisches Küchengewürz Mitteleuropas.",caution:"Küchenkraut und konzentriertes ätherisches Öl sind nicht gleichzusetzen."},
+    {id:"basilikum",name:"Basilikum",latin:"Ocimum basilicum",tags:["kueche"],intro:"Wärmeliebendes Blattkraut in vielen Duftvarianten.",grow:"Hell und warm, ohne Frost. Boden gleichmäßig leicht feucht halten.",harvest:"Triebe über Blattpaaren schneiden, damit die Pflanze sich verzweigen kann.",use:"Frisch zu Salat, Gemüse und Pesto; erst spät zu warmen Speisen geben.",tradition:"Von vielen Sorten gibt es zitronige, anisartige und würzige Varianten.",caution:"Frische Blätter gründlich waschen."},
+    {id:"schnittlauch",name:"Schnittlauch",latin:"Allium schoenoprasum",tags:["kueche"],intro:"Röhrenförmige grüne Blätter und essbare Blüten aus sicherem Anbau.",grow:"Sonnig bis halbschattig, nährstoffreich und regelmäßig feucht.",harvest:"Blätter nicht zu tief abschneiden; sie treiben wieder nach.",use:"Über Pellkartoffeln, in Quark, zu Rührei oder auf Brot.",tradition:"Beliebtes Küchenkraut auch für kleine Töpfe und Balkonkästen.",caution:"Nicht mit giftigen, ähnlich aussehenden Zwiebelgewächsen aus der Natur verwechseln."},
+    {id:"petersilie",name:"Petersilie",latin:"Petroselinum crispum",tags:["kueche"],intro:"Glatte oder krause Blätter; normalerweise zweijährig.",grow:"Nährstoffreiche Erde, leicht feucht, sonnig bis halbschattig.",harvest:"Blätter vom Außenbereich der Pflanze pflücken; frisch oder eingefroren nutzen.",use:"Zu Kartoffeln, Suppen und Salaten; frisch oft besonders aromatisch.",tradition:"Glatte und krause Sorten haben unterschiedliche Texturen.",caution:"Nicht mit giftigen Doldenblütlern aus der freien Natur verwechseln; keine Wildpflanze auf Verdacht sammeln."},
+    {id:"dill",name:"Dill",latin:"Anethum graveolens",tags:["kueche"],intro:"Feinfiedrige Blätter, gelbe Blütendolden, würziger Duft.",grow:"Sonnig und mäßig feucht, am besten direkt in die Erde säen.",harvest:"Blattspitzen nach Bedarf; Blüten und Samen später für die Küche.",use:"Besonders gut zu Gurken, Kartoffeln und Kräuterquark.",tradition:"Dill ist auch eine Futterpflanze für einige Insekten.",caution:"Wilde Doldenblütler können gefährlich ähnlich aussehen."},
+    {id:"kerbel",name:"Kerbel",latin:"Anthriscus cerefolium",tags:["kueche"],intro:"Feines, leicht anisartiges Küchenkraut.",grow:"Mag eher kühle Temperaturen und halbschattige Plätze; sät sich leicht aus.",harvest:"Zarte Blätter vor der Blüte schneiden.",use:"Zum Schluss in Suppen, Saucen oder Kräuterquark geben.",tradition:"Teil der klassischen französischen Kräutermischung Fines herbes.",caution:"Nicht wild sammeln: hochgiftige Doldenblütler können ähnlich aussehen."},
+    {id:"estragon",name:"Estragon",latin:"Artemisia dracunculus",tags:["kueche"],intro:"Schmale, aromatische Blätter mit anisartiger Note.",grow:"Sonnig und geschützt, durchlässiger Boden; französischer Estragon wird durch Teilung vermehrt.",harvest:"Junge Triebspitzen in der Wachstumszeit ernten.",use:"In Vinaigrettes, Gemüse und Kräutersaucen.",tradition:"Bekannt aus der französischen Küche.",caution:"Nur klar bestimmte Küchensorten verwenden."},
+    {id:"liebstoeckel",name:"Liebstöckel",latin:"Levisticum officinale",tags:["kueche"],intro:"Kräftige Staude mit intensiv würzigem Aroma.",grow:"Nährstoffreicher, ausreichend feuchter Boden; viel Platz lassen.",harvest:"Junge Blätter sparsam ernten, frisch oder getrocknet nutzen.",use:"Wenig davon genügt zum Würzen von Gemüsebrühe und Suppen.",tradition:"Auch als Maggikraut bekannt.",caution:"Aus unbekannten Doldenblütlern keinesfalls wild ernten."},
+    {id:"bohnenkraut",name:"Bohnenkraut",latin:"Satureja hortensis",tags:["kueche"],intro:"Würzig-pfeffriges Kraut mit kleinen Blättern.",grow:"Sonniger Standort und durchlässige Erde.",harvest:"Triebspitzen vor der Blüte ernten und trocknen.",use:"Zu Bohnen, Eintöpfen, Kartoffeln und anderem Gemüse.",tradition:"Im Garten gibt es einjähriges Sommer- und ausdauerndes Winterbohnenkraut.",caution:"Bei verschiedenen Arten auf die richtige Beschriftung achten."},
+    {id:"lorbeer",name:"Echter Lorbeer",latin:"Laurus nobilis",tags:["kueche","tradition"],intro:"Immergrünes Gehölz mit lederartigen aromatischen Blättern.",grow:"Hell, geschützt und gut drainiert; im Kübel vor starkem Frost schützen.",harvest:"Ausgewachsene Blätter nach Bedarf ernten und trocken lagern.",use:"Ein Blatt würzt Suppen und Eintöpfe; vor dem Essen entfernen.",tradition:"Lorbeerkränze sind aus der Antike bekannt.",caution:"Kirschlorbeer ist eine andere, giftige Pflanze. Niemals verwechseln."},
+    {id:"ringelblume",name:"Ringelblume",latin:"Calendula officinalis",tags:["tradition"],intro:"Leuchtend gelbe oder orange Blüten im Sommer.",grow:"Leicht aus Samen, sonnig und nicht zu nass.",harvest:"Blüten bei trockenem Wetter pflücken und luftig trocknen.",use:"Als Blütendekoration oder Bastelmaterial; selbstgemachte Pflegeprodukte brauchen hygienische Herstellung.",tradition:"Historisches Kloster- und Bauerngartenkraut.",caution:"Bei Korbblütlerallergie Vorsicht; medizinische Anwendungen nicht aus bloßen Traditionen ableiten."},
+    {id:"kamille",name:"Echte Kamille",latin:"Matricaria chamomilla",tags:["tradition","wild"],intro:"Feine Blätter, weiße Zungenblüten und ein hohler Blütenboden.",grow:"Sonnig, meist einjährig, gerne mit Platz zum Aussamen.",harvest:"Blüten bei trockenem Wetter ernten und locker, schattig trocknen.",use:"Bekannt als traditionelle Duftpflanze, auch für Trockenblumen.",tradition:"In historischen Haus- und Kräutergärten weit verbreitet.",caution:"Verwechslungsgefahr mit anderen Korbblütlern; bei Allergien vorsichtig."},
+    {id:"schafgarbe",name:"Schafgarbe",latin:"Achillea millefolium",tags:["wild","tradition"],intro:"Fein gefiederte Blätter und flache Gruppen aus vielen kleinen Blüten.",grow:"Als heimische Wiesenpflanze liebt sie eher sonnige Plätze.",harvest:"Traditionell oberirdische Blütenteile trocknen; selbst gesammelte Pflanzen sicher bestimmen.",use:"Heute vor allem als Wiesen- und Insektenpflanze interessant.",tradition:"In vielen Regionen auch ein traditionelles Räucherkraut, oft in Duftbündeln erwähnt.",caution:"Verwechslungsgefahr mit anderen Arten; bei Korbblütlerallergie Vorsicht."},
+    {id:"wermut",name:"Wermut",latin:"Artemisia absinthium",tags:["wild","tradition"],intro:"Silbrig-graue Blätter mit bitterem, kräftigem Geruch.",grow:"Sonniger, trockener Standort und ausreichend Platz.",harvest:"Aromatische oberirdische Pflanzenteile können als Anschauungsmaterial getrocknet werden.",use:"Interessant als historische Bitter- und Duftpflanze.",tradition:"In europäischen Kräuterüberlieferungen eng mit Beifuß verbunden.",caution:"Konzentrierte Inhaltsstoffe können schädlich sein; keine eigenständige innerliche oder medizinische Anwendung."},
+    {id:"wacholder",name:"Wacholder",latin:"Juniperus communis",tags:["tradition","wild"],intro:"Immergrünes Nadelgehölz mit beerenähnlichen Zapfen.",grow:"Sonnige Standorte, durchlässige Böden; wächst langsam.",harvest:"Nicht wild sammeln, ohne Art und Schutzstatus genau zu prüfen.",use:"Bestimmte Arten werden traditionell als Gewürz verwendet.",tradition:"In nord- und mitteleuropäischen Überlieferungen als Duft- und Räucherpflanze erwähnt.",caution:"Nicht alle Wacholderarten sind essbar; viele sind für Haustiere ungeeignet."},
+    {id:"brennnessel",name:"Große Brennnessel",latin:"Urtica dioica",tags:["wild"],intro:"Heimische Pflanze mit Brennhaaren und großem Nutzen für Insekten.",grow:"Wächst gerne auf nährstoffreichen Böden, verbreitet sich kräftig.",harvest:"Zum Beobachten oder späteren Sammeln nur mit sicherer Kenntnis und Schutz vor Brennhaaren.",use:"Wichtiges Raupenfutter; historisch auch als Faserpflanze genutzt.",tradition:"Brennnesselfasern wurden früher zu Stoff verarbeitet.",caution:"Brennhaare verursachen Hautreizungen; keine unbekannten Wildpflanzen essen."},
+    {id:"spitzwegerich",name:"Spitzwegerich",latin:"Plantago lanceolata",tags:["wild"],intro:"Lanzettliche Blätter mit parallelen, auffälligen Blattnerven.",grow:"Wächst häufig auf Wiesen und an Wegrändern.",harvest:"Am besten beobachten und für eine sichere Bestimmung Fotos und Merkmale vergleichen.",use:"Interessante heimische Wiesenpflanze mit markanten Blütenähren.",tradition:"Seit Jahrhunderten als Pflanzenname und Wildpflanze in Kräuterbüchern verzeichnet.",caution:"Am Straßenrand wachsen oft belastete Pflanzen; nicht auf Verdacht sammeln."},
+    {id:"kapuzinerkresse",name:"Kapuzinerkresse",latin:"Tropaeolum majus",tags:["kueche"],intro:"Runde Blätter und meist leuchtend gelbe, orange oder rote Blüten.",grow:"Sonnig bis halbschattig; als rankende oder buschige Sorte erhältlich.",harvest:"Saubere Blätter und Blüten aus eindeutig bestimmtem Eigenanbau ernten.",use:"Frische Blüten und Blätter können Salat dekorieren und würzen.",tradition:"Eine beliebte Pflanze für Nutz- und Ziergärten.",caution:"Nur ungespritzte, sicher bestimmte Pflanzen verzehren."}
+  ];
+  let currentFilter = "all", currentSearch = "";
+  const list = document.querySelector("#herbList");
+  if (!list) return;
+  const safe = v => escapeHtml(String(v ?? ""));
+  const notes = () => (state.herbNotes && typeof state.herbNotes === "object") ? state.herbNotes : (state.herbNotes = {});
+  const customHerbs = () => Array.isArray(state.herbCustom) ? state.herbCustom : (state.herbCustom = []);
+  function allHerbs() {return [...HERBS, ...customHerbs().map(x=>({id:x.id,name:x.name,latin:"Mein Eintrag",tags:["custom"],intro:"Deine eigene Kräuterentdeckung.",grow:"",harvest:"",use:"",tradition:"",caution:""}))];}
+  function detail(label,value){return value ? `<div class="herb-fact"><strong>${safe(label)}</strong>${safe(value)}</div>` : "";}
+  function renderList(expandId){
+    const q=currentSearch.trim().toLocaleLowerCase("de-DE");
+    const filtered=allHerbs().filter(x=>(currentFilter==="all"||x.tags.includes(currentFilter))&&[x.name,x.latin,x.intro].join(" ").toLocaleLowerCase("de-DE").includes(q));
+    document.querySelector("#herbResultsCount").textContent=filtered.length+" Kräuter gefunden · Tippe auf einen Namen, um mehr zu lesen";
+    list.innerHTML=filtered.length?filtered.map(x=>`<details class="herb-card" data-herb-id="${safe(x.id)}" ${x.id===expandId?"open":""}><summary><div><div class="herb-card-title">${safe(x.name)}</div><div class="herb-card-latin">${safe(x.latin)}</div><div class="herb-card-sub">${safe(x.intro)}</div></div></summary><div class="herb-content">${detail("Anbauen & pflegen",x.grow)}${detail("Ernten & aufbewahren",x.harvest)}${detail("Verwendung",x.use)}${detail("Überlieferung & Räucherkultur",x.tradition)}${detail("Wichtig",x.caution)}<label for="herbnote-${safe(x.id)}">Meine Entdeckungen</label><textarea id="herbnote-${safe(x.id)}" class="herb-note" data-note-id="${safe(x.id)}" placeholder="Was hast du herausgefunden oder ausprobiert?">${safe(notes()[x.id]||"")}</textarea><div class="herb-actions"><button type="button" class="primary-btn herb-save" data-save-id="${safe(x.id)}">Notiz speichern</button><span class="herb-saved" data-status-id="${safe(x.id)}" aria-live="polite"></span>${x.tags.includes("custom")?`<button type="button" class="secondary-btn herb-remove" data-remove-id="${safe(x.id)}">Eigenes Kraut löschen</button>`:""}</div></div></details>`).join(""):'<p class="empty">Keine passenden Kräuter gefunden.</p>';
+  }
+  function saveNote(id){
+    const field=[...list.querySelectorAll("[data-note-id]")].find(el=>el.dataset.noteId===id);
+    if(!field)return;
+    notes()[id]=field.value;
+    save();
+    const st=[...list.querySelectorAll("[data-status-id]")].find(el=>el.dataset.statusId===id);
+    if(st)st.textContent="Gespeichert ✓";
+  }
+  // Beim Verlassen eines Notizfeldes ebenfalls speichern, auch ohne Button.
+  list.addEventListener("change",ev=>{
+    if(ev.target.matches("textarea[data-note-id]"))saveNote(ev.target.dataset.noteId);
+  });
+  list.addEventListener("click",ev=>{
+    const saveBtn=ev.target.closest("[data-save-id]");if(saveBtn){saveNote(saveBtn.dataset.saveId);return;}
+    const removeBtn=ev.target.closest("[data-remove-id]");if(removeBtn){
+      const id=removeBtn.dataset.removeId;
+      if(!confirm("Eigenes Kraut samt Notiz wirklich löschen?"))return;
+      state.herbCustom=customHerbs().filter(x=>x.id!==id);
+      delete notes()[id];save();renderList();
+    }
+  });
+  document.querySelector("#herbSearch").addEventListener("input",ev=>{currentSearch=ev.target.value;renderList()});
+  document.querySelector("#herbFilter").addEventListener("change",ev=>{currentFilter=ev.target.value;renderList()});
+  document.querySelector("#addHerbBtn").addEventListener("click",()=>{
+    const inp=document.querySelector("#newHerbName"),name=inp.value.trim().replace(/\s+/g," ");
+    if(!name){showToast("Bitte einen Kräuternamen eingeben");return;}
+    if(allHerbs().some(h=>h.name.toLocaleLowerCase("de-DE")===name.toLocaleLowerCase("de-DE"))){showToast("Dieses Kraut gibt es schon");return;}
+    const id="own-"+uid();customHerbs().push({id,name});inp.value="";save();
+    currentSearch="";currentFilter="all";
+    document.querySelector("#herbSearch").value="";
+    document.querySelector("#herbFilter").value="all";
+    renderList(id);
+    list.querySelector(`[data-herb-id="${id}"]`)?.scrollIntoView({block:"start",behavior:"smooth"});
+  });
+  document.querySelector('[data-view="herbView"]')?.addEventListener("click",()=>renderList());
+  function openHerb(id){
+    currentSearch="";currentFilter="all";
+    document.querySelector("#herbSearch").value="";
+    document.querySelector("#herbFilter").value="all";
+    setView("herbView");renderList(id);
+    list.querySelector(`[data-herb-id="${id}"]`)?.scrollIntoView({block:"start",behavior:"smooth"});
+  }
+  window.openHerbKnowledge=openHerb;
+  window.updateHerbThoughtLink=function(text){
+    const btn=document.querySelector("#thoughtHerbLink");if(!btn)return;
+    const norm=String(text).toLocaleLowerCase("de-DE");
+    const aliases={"beifuss":"beifuß","liebstoeckel":"liebstöckel","pfefferminze":"minze","zitronenmelisse":"melisse","ringelblume":"ringelblumen","kamille":"kamille","brennnessel":"brennnessel","wacholder":"wacholder","kapuzinerkresse":"kapuzinerkresse","schafgarbe":"schafgarbe"};
+    const target=HERBS.find(x=>norm.includes(x.name.toLocaleLowerCase("de-DE"))||(aliases[x.id]&&norm.includes(aliases[x.id])));
+    btn.hidden=!target;
+    if(target){btn.onclick=()=>openHerb(target.id);btn.textContent="🌿 Mehr über "+target.name+" im Kräuterwissen →";}
+  };
+  renderList();
+  if(document.querySelector("#dailyQuote"))window.updateHerbThoughtLink(document.querySelector("#dailyQuote").textContent);
+})();
